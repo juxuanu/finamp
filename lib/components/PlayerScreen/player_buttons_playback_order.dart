@@ -4,7 +4,6 @@ import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/music_player_background_task.dart';
-import 'package:finamp/services/queue_service.dart';
 import 'package:finamp/services/playback/playback_backend.dart';
 import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/utils/locale_helper.dart';
@@ -16,7 +15,7 @@ import 'package:get_it/get_it.dart';
 
 class PlayerButtonsPlaybackOrder extends ConsumerWidget {
   final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
-  final _queueService = GetIt.instance<QueueService>();
+  final _playback = GetIt.instance<PlaybackController>();
 
   PlayerButtonsPlaybackOrder({super.key});
 
@@ -28,11 +27,11 @@ class PlayerButtonsPlaybackOrder extends ConsumerWidget {
     }
 
     return StreamBuilder(
-      stream: _queueService.getPlaybackOrderStream(),
-      initialData: _queueService.playbackOrder,
+      stream: _playback.playbackOrder,
+      initialData: _playback.playbackOrder.value,
       builder: (BuildContext context, snapshot) {
         final shortcutHint = GlobalShortcuts.getDisplay(TogglePlaybackOrderIntent);
-        final playbackOrderHint = getLocalizedPlaybackOrder(context, _queueService.playbackOrder);
+        final playbackOrderHint = getLocalizedPlaybackOrder(context, _playback.playbackOrder.value);
         return IconButton(
           tooltip: getStringComponentsInLocaleOrder(context, [
             playbackOrderHint,
@@ -40,7 +39,7 @@ class PlayerButtonsPlaybackOrder extends ConsumerWidget {
           ], separator: "\n"),
           onPressed: () async {
             FeedbackHelper.feedback(FeedbackType.light);
-            await _queueService.togglePlaybackOrder();
+            await _playback.togglePlaybackOrder();
           },
           icon: Icon(
             (snapshot.data! == FinampPlaybackOrder.shuffled ? TablerIcons.arrows_shuffle : TablerIcons.arrows_right),

@@ -14,6 +14,7 @@ import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/services/current_track_metadata_provider.dart';
 import 'package:finamp/services/feedback_helper.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:finamp/services/theme_provider.dart';
 import 'package:finamp/services/widget_bindings_observer_provider.dart';
@@ -164,7 +165,7 @@ class NowPlayingBar extends ConsumerWidget {
   }
 
   Widget buildNowPlayingBar(WidgetRef ref, FinampQueueItem currentTrack) {
-    final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
+    final playback = GetIt.instance<PlaybackController>();
     final queueService = GetIt.instance<QueueService>();
 
     Duration? playbackPosition;
@@ -219,10 +220,10 @@ class NowPlayingBar extends ConsumerWidget {
                 confirmDismiss: (direction) async {
                   if (direction == DismissDirection.endToStart) {
                     FeedbackHelper.feedback(FeedbackType.light);
-                    await audioHandler.skipToNext();
+                    await playback.skipToNext();
                   } else {
                     FeedbackHelper.feedback(FeedbackType.light);
-                    await audioHandler.skipToPrevious(forceSkip: true);
+                    await playback.skipToPrevious(forceSkip: true);
                   }
                   return false;
                 },
@@ -276,7 +277,7 @@ class NowPlayingBar extends ConsumerWidget {
                                   tooltip: AppLocalizations.of(context)!.togglePlaybackButtonTooltip,
                                   onPressed: () {
                                     FeedbackHelper.feedback(FeedbackType.light);
-                                    unawaited(audioHandler.togglePlayback());
+                                    unawaited(playback.togglePlayback());
                                   },
                                   color: Colors.white,
                                   icon: Icon(
@@ -295,7 +296,7 @@ class NowPlayingBar extends ConsumerWidget {
                                 Positioned.fill(
                                   child: StreamBuilder<Duration>(
                                     stream: AudioService.position,
-                                    initialData: audioHandler.playbackState.value.position,
+                                    initialData: playback.playbackState.value.position,
                                     builder: (context, snapshot) {
                                       if (snapshot.hasData) {
                                         playbackPosition = snapshot.data;
@@ -365,7 +366,7 @@ class NowPlayingBar extends ConsumerWidget {
                                               ),
                                               StreamBuilder<Duration>(
                                                 stream: AudioService.position,
-                                                initialData: audioHandler.playbackState.value.position,
+                                                initialData: playback.playbackState.value.position,
                                                 builder: (context, snapshot) {
                                                   if (snapshot.hasData) {
                                                     playbackPosition = snapshot.data;
@@ -481,7 +482,7 @@ class NowPlayingBar extends ConsumerWidget {
                                                 tooltip: AppLocalizations.of(context)!.togglePlaybackButtonTooltip,
                                                 onPressed: () {
                                                   FeedbackHelper.feedback(FeedbackType.light);
-                                                  unawaited(audioHandler.togglePlayback());
+                                                  unawaited(playback.togglePlayback());
                                                 },
                                                 color: primaryTextColor,
                                                 visualDensity: VisualDensity.compact,
@@ -515,6 +516,7 @@ class NowPlayingBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return Hero(
       tag: "nowplaying",
@@ -528,7 +530,7 @@ class NowPlayingBar extends ConsumerWidget {
             builder: (context, ref, child) {
               ref.listen(currentTrackMetadataProvider, (metadataOrNull, metadata) {}); // keep provider alive
               return StreamBuilder<FinampQueueInfo?>(
-                stream: queueService.getQueueStream(),
+                stream: playback.queue,
                 initialData: queueService.getQueue(),
                 builder: (context, snapshot) {
                   if (snapshot.hasData &&

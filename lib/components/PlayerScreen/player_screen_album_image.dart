@@ -5,8 +5,7 @@ import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
-import 'package:finamp/services/music_player_background_task.dart';
-import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
@@ -22,10 +21,9 @@ class PlayerScreenAlbumImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
-    final audioService = GetIt.instance<MusicPlayerBackgroundTask>();
+    final playback = GetIt.instance<PlaybackController>();
     return StreamBuilder<FinampQueueInfo?>(
-      stream: queueService.getQueueStream(),
+      stream: playback.queue,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           // show loading indicator
@@ -56,11 +54,11 @@ class PlayerScreenAlbumImage extends ConsumerWidget {
             child: SimpleGestureDetector(
               //TODO replace with PageView, this is just a placeholder
               onTap: () {
-                unawaited(audioService.togglePlayback());
+                unawaited(playback.togglePlayback());
                 FeedbackHelper.feedback(FeedbackType.selection);
               },
               onDoubleTap: () {
-                final currentTrack = queueService.getCurrentTrack();
+                final currentTrack = playback.currentTrack.valueOrNull;
                 if (currentTrack?.baseItem != null && !FinampSettingsHelper.finampSettings.isOffline) {
                   ref.read(isFavoriteProvider(currentTrack!.baseItem).notifier).toggleFavorite();
                 }
@@ -68,12 +66,12 @@ class PlayerScreenAlbumImage extends ConsumerWidget {
               onHorizontalSwipe: (direction) {
                 if (direction == SwipeDirection.left) {
                   if (!FinampSettingsHelper.finampSettings.disableGesture) {
-                    queueService.skipByOffset(1);
+                    playback.skipByOffset(1);
                     FeedbackHelper.feedback(FeedbackType.selection);
                   }
                 } else if (direction == SwipeDirection.right) {
                   if (!FinampSettingsHelper.finampSettings.disableGesture) {
-                    queueService.skipByOffset(-1);
+                    playback.skipByOffset(-1);
                     FeedbackHelper.feedback(FeedbackType.selection);
                   }
                 }

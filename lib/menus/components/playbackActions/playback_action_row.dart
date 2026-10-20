@@ -3,7 +3,7 @@ import 'package:finamp/menus/components/playbackActions/playback_actions.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/music_models.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
-import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,7 +36,7 @@ class _PlaybackActionRowState extends ConsumerState<PlaybackActionRow> {
 
   @override
   Widget build(BuildContext context) {
-    final nextUpEmpty = ref.watch(QueueService.queueProvider)?.nextUp.isEmpty ?? true;
+    final nextUpEmpty = ref.watch(PlaybackController.queueProvider)?.nextUp.isEmpty ?? true;
     final preferPreprendingToNextUp = ref.watch(finampSettingsProvider.preferNextUpPrepending);
 
     final Map<PlaybackActionRowPage, Widget> playbackActionPages = getPlaybackActionPages(

@@ -49,8 +49,7 @@ import '../../extensions/localizations.dart';
 /// Whether the active playback backend supports [capability]. A remote-controlled
 /// session may not, e.g. its queue can't be edited. The lists rebuild from the
 /// queue stream, which emits whenever the backend switches.
-bool _backendSupports(PlaybackCapability capability) =>
-    GetIt.instance<PlaybackController>().backend.supports(capability);
+bool _backendSupports(PlaybackCapability capability) => GetIt.instance<PlaybackController>().supports(capability);
 
 class QueueListStreamState {
   QueueListStreamState(this.mediaState, this.queueInfo);
@@ -96,7 +95,7 @@ void scrollToKey({required GlobalKey key, Duration duration = const Duration(mil
 }
 
 class _QueueListState extends ConsumerState<QueueList> {
-  final _queueService = GetIt.instance<QueueService>();
+  final _playback = GetIt.instance<PlaybackController>();
 
   QueueItemSource? _source;
   late int _previousTrackCount;
@@ -113,13 +112,13 @@ class _QueueListState extends ConsumerState<QueueList> {
   void initState() {
     super.initState();
 
-    _queueService.getQueueStream().listen((queueInfo) {
+    _playback.queue.listen((queueInfo) {
       _source = queueInfo?.source;
       _previousTrackCount = queueInfo?.previousTracks.length ?? 0;
     });
 
-    _source = _queueService.getQueue().source;
-    _previousTrackCount = _queueService.getQueue().previousTracks.length;
+    _source = _playback.queue.valueOrNull?.source;
+    _previousTrackCount = (_playback.queue.valueOrNull?.previousTracks.length ?? 0);
 
     _contents = <Widget>[];
 
@@ -163,7 +162,7 @@ class _QueueListState extends ConsumerState<QueueList> {
         if (context.mounted &&
             widget.scrollController.hasClients &&
             FinampSettingsHelper.finampSettings.previousTracksExpanded) {
-          final changeHeight = _queueService.getQueue().previousTracks.length * QueueListTile.height;
+          final changeHeight = (_playback.queue.valueOrNull?.previousTracks.length ?? 0) * QueueListTile.height;
           var target = widget.scrollController.position.pixels + changeHeight - 50;
           target = target.clamp(
             widget.scrollController.position.minScrollExtent,
@@ -195,7 +194,7 @@ class _QueueListState extends ConsumerState<QueueList> {
             FinampSetters.setPreviousTracksExpanded(expanded);
 
             if (!widget.scrollController.hasClients) return;
-            final changeHeight = _queueService.getQueue().previousTracks.length * QueueListTile.height;
+            final changeHeight = (_playback.queue.valueOrNull?.previousTracks.length ?? 0) * QueueListTile.height;
             widget.scrollController.position.correctBy(expanded ? changeHeight : -changeHeight);
             if (expanded) {
               widget.scrollController.animateTo(
@@ -211,8 +210,8 @@ class _QueueListState extends ConsumerState<QueueList> {
       // next up
       SliverToBoxAdapter(key: nextUpHeaderKey),
       StreamBuilder(
-        stream: _queueService.getQueueStream(),
-        initialData: _queueService.getQueue(),
+        stream: _playback.queue,
+        initialData: _playback.queue.valueOrNull,
         builder: (context, snapshot) {
           if (snapshot.data != null && snapshot.data!.nextUp.isNotEmpty) {
             return SliverStickyHeader(
@@ -423,7 +422,7 @@ class PreviousTracksList extends StatefulWidget {
 }
 
 class _PreviousTracksListState extends State<PreviousTracksList> with TickerProviderStateMixin {
-  final _queueService = GetIt.instance<QueueService>();
+  final _playback = GetIt.instance<PlaybackController>();
   List<FinampQueueItem>? _previousTracks;
 
   @override
@@ -431,8 +430,8 @@ class _PreviousTracksListState extends State<PreviousTracksList> with TickerProv
     return MenuMask(
       height: MenuMaskHeight(0.0),
       child: StreamBuilder<FinampQueueInfo?>(
-        stream: _queueService.getQueueStream(),
-        initialData: _queueService.getQueue(),
+        stream: _playback.queue,
+        initialData: _playback.queue.valueOrNull,
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             // Always take the latest list: the local queue mutates the same list in place,
@@ -451,7 +450,7 @@ class _PreviousTracksListState extends State<PreviousTracksList> with TickerProv
                     FinampQueueItem tmp = _previousTracks!.removeAt(oldIndex);
                     _previousTracks!.insert(newIndex, tmp);
                     // update external queue to commit changes, results in a rebuild
-                    _queueService.reorderByOffset(draggingOffset, newPositionOffset);
+                    _playback.reorderByOffset(draggingOffset, newPositionOffset);
                   });
                 }
               },
@@ -481,13 +480,13 @@ class _PreviousTracksListState extends State<PreviousTracksList> with TickerProv
                   allowReorder: _backendSupports(PlaybackCapability.editQueue),
                   onTap: (bool playable) async {
                     FeedbackHelper.feedback(FeedbackType.selection);
-                    await _queueService.skipByOffset(indexOffset);
+                    await _playback.skipByOffset(indexOffset);
                     scrollToKey(key: widget.previousTracksHeaderKey, duration: const Duration(milliseconds: 500));
                   },
                   onRemoveFromList: !_backendSupports(PlaybackCapability.editQueue)
                       ? null
                       : () {
-                          unawaited(_queueService.removeAtOffset(indexOffset));
+                          unawaited(_playback.removeAtOffset(indexOffset));
                         },
                 );
               },
@@ -511,7 +510,7 @@ class NextUpTracksList extends StatefulWidget {
 }
 
 class _NextUpTracksListState extends State<NextUpTracksList> {
-  final _queueService = GetIt.instance<QueueService>();
+  final _playback = GetIt.instance<PlaybackController>();
   List<FinampQueueItem>? _nextUp;
 
   @override
@@ -519,8 +518,8 @@ class _NextUpTracksListState extends State<NextUpTracksList> {
     return MenuMask(
       height: NextUpSectionHeader.defaultHeight,
       child: StreamBuilder<FinampQueueInfo?>(
-        stream: _queueService.getQueueStream(),
-        initialData: _queueService.getQueue(),
+        stream: _playback.queue,
+        initialData: _playback.queue.valueOrNull,
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             _nextUp = snapshot.data!.nextUp;
@@ -540,7 +539,7 @@ class _NextUpTracksListState extends State<NextUpTracksList> {
                       FinampQueueItem tmp = _nextUp!.removeAt(oldIndex);
                       _nextUp!.insert(newIndex, tmp);
                       // update external queue to commit changes, results in a rebuild
-                      _queueService.reorderByOffset(draggingOffset, newPositionOffset);
+                      _playback.reorderByOffset(draggingOffset, newPositionOffset);
                     });
                   }
                 },
@@ -570,11 +569,11 @@ class _NextUpTracksListState extends State<NextUpTracksList> {
                     onRemoveFromList: !_backendSupports(PlaybackCapability.editQueue)
                         ? null
                         : () {
-                            unawaited(_queueService.removeAtOffset(indexOffset));
+                            unawaited(_playback.removeAtOffset(indexOffset));
                           },
                     onTap: (bool playable) async {
                       FeedbackHelper.feedback(FeedbackType.selection);
-                      await _queueService.skipByOffset(indexOffset);
+                      await _playback.skipByOffset(indexOffset);
                       scrollToKey(key: widget.previousTracksHeaderKey, duration: const Duration(milliseconds: 500));
                     },
                   );
@@ -600,7 +599,7 @@ class QueueTracksList extends ConsumerStatefulWidget {
 }
 
 class _QueueTracksListState extends ConsumerState<QueueTracksList> {
-  final _queueService = GetIt.instance<QueueService>();
+  final _playback = GetIt.instance<PlaybackController>();
   List<FinampQueueItem>? _queue;
   List<FinampQueueItem>? _nextUp;
 
@@ -611,8 +610,8 @@ class _QueueTracksListState extends ConsumerState<QueueTracksList> {
           ? QueueSectionHeader.radioActiveHeight
           : QueueSectionHeader.defaultHeight,
       child: StreamBuilder<FinampQueueInfo?>(
-        stream: _queueService.getQueueStream(),
-        initialData: _queueService.getQueue(),
+        stream: _playback.queue,
+        initialData: _playback.queue.valueOrNull,
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             _queue = snapshot.data!.queue;
@@ -626,7 +625,7 @@ class _QueueTracksListState extends ConsumerState<QueueTracksList> {
                 int newPositionOffset = newIndex + (_nextUp?.length ?? 0) + 1;
                 if (mounted) {
                   // update external queue to commit changes, but don't await it
-                  _queueService.reorderByOffset(draggingOffset, newPositionOffset);
+                  _playback.reorderByOffset(draggingOffset, newPositionOffset);
                   FeedbackHelper.feedback(FeedbackType.heavy);
                   setState(() {
                     // temporarily update internal queue
@@ -662,11 +661,11 @@ class _QueueTracksListState extends ConsumerState<QueueTracksList> {
                   onRemoveFromList: !_backendSupports(PlaybackCapability.editQueue)
                       ? null
                       : () {
-                          unawaited(_queueService.removeAtOffset(indexOffset));
+                          unawaited(_playback.removeAtOffset(indexOffset));
                         },
                   onTap: (bool playable) async {
                     FeedbackHelper.feedback(FeedbackType.selection);
-                    await _queueService.skipByOffset(indexOffset);
+                    await _playback.skipByOffset(indexOffset);
                     scrollToKey(key: widget.previousTracksHeaderKey, duration: const Duration(milliseconds: 500));
                   },
                 );
@@ -689,14 +688,12 @@ class CurrentTrack extends ConsumerStatefulWidget {
 }
 
 class _CurrentTrackState extends ConsumerState<CurrentTrack> {
-  late QueueService _queueService;
-  late MusicPlayerBackgroundTask _audioHandler;
+  late PlaybackController _playback;
 
   @override
   void initState() {
     super.initState();
-    _queueService = GetIt.instance<QueueService>();
-    _audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
+    _playback = GetIt.instance<PlaybackController>();
   }
 
   @override
@@ -710,16 +707,16 @@ class _CurrentTrackState extends ConsumerState<CurrentTrack> {
     return StreamBuilder<QueueListStreamState>(
       stream: Rx.combineLatest2<MediaState, FinampQueueInfo?, QueueListStreamState>(
         mediaStateStream,
-        _queueService.getQueueStream(),
+        _playback.queue,
         (a, b) => QueueListStreamState(a, b),
       ),
       initialData: QueueListStreamState(
         MediaState(
-          audioHandler.mediaItem.value,
-          audioHandler.playbackState.value,
+          _playback.mediaItem.valueOrNull,
+          _playback.playbackState.value,
           audioHandler.fadeState.value.fadeDirection,
         ),
-        _queueService.getQueue(),
+        _playback.queue.valueOrNull,
       ),
       builder: (context, snapshot) {
         var data = snapshot.data;
@@ -788,7 +785,7 @@ class _CurrentTrackState extends ConsumerState<CurrentTrack> {
                           child: IconButton(
                             onPressed: () {
                               FeedbackHelper.feedback(FeedbackType.selection);
-                              _audioHandler.togglePlayback();
+                              _playback.togglePlayback();
                             },
                             icon: mediaState!.playbackState.playing
                                 ? const Icon(
@@ -812,7 +809,7 @@ class _CurrentTrackState extends ConsumerState<CurrentTrack> {
                           Positioned.fill(
                             child: StreamBuilder<Duration>(
                               stream: AudioService.position,
-                              initialData: _audioHandler.playbackState.value.position,
+                              initialData: _playback.playbackState.value.position,
                               builder: (context, snapshot) {
                                 if (snapshot.hasData) {
                                   playbackPosition = snapshot.data;
@@ -884,7 +881,7 @@ class _CurrentTrackState extends ConsumerState<CurrentTrack> {
                                             children: [
                                               StreamBuilder<Duration>(
                                                 stream: AudioService.position,
-                                                initialData: _audioHandler.playbackState.value.position,
+                                                initialData: _playback.playbackState.value.position,
                                                 builder: (context, snapshot) {
                                                   final TextStyle style = TextStyle(
                                                     color: primaryTextColor,
@@ -1025,6 +1022,7 @@ class QueueSectionHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     final radioEnabled = ref.watch(finampSettingsProvider.radioEnabled);
     final radioMode = ref.watch(finampSettingsProvider.radioMode);
@@ -1051,8 +1049,8 @@ class QueueSectionHeader extends ConsumerWidget {
                       children: [
                         title,
                         StreamBuilder(
-                          stream: queueService.getQueueStream(),
-                          initialData: queueService.getQueue(),
+                          stream: playback.queue,
+                          initialData: playback.queue.valueOrNull,
                           builder: (context, snapshot) {
                             if (snapshot.hasData) {
                               var remaining = snapshot.data!.remainingDuration;
@@ -1087,14 +1085,14 @@ class QueueSectionHeader extends ConsumerWidget {
               if (controls)
                 StreamBuilder(
                   stream: Rx.combineLatest3(
-                    queueService.getPlaybackOrderStream(),
-                    queueService.getLoopModeStream(),
+                    playback.playbackOrder,
+                    playback.loopMode,
                     queueService.getPlaybackSpeedStream(),
                     (a, b, c) => PlaybackBehaviorInfo(a, b, c),
                   ),
                   initialData: PlaybackBehaviorInfo(
-                    queueService.playbackOrder,
-                    queueService.loopMode,
+                    playback.playbackOrder.value,
+                    playback.loopMode.value,
                     queueService.playbackSpeed,
                   ),
                   builder: (context, snapshot) {
@@ -1117,7 +1115,7 @@ class QueueSectionHeader extends ConsumerWidget {
                                   ),
                             visualDensity: VisualDensity.standard,
                             onPressed: () async {
-                              await queueService.togglePlaybackOrder();
+                              await playback.togglePlaybackOrder();
                               FeedbackHelper.feedback(FeedbackType.selection);
                               if (queueService.getQueue().nextUp.isNotEmpty) {
                                 scrollToKey(key: nextUpHeaderKey);
@@ -1158,7 +1156,7 @@ class QueueSectionHeader extends ConsumerWidget {
                                 );
                                 return;
                               }
-                              queueService.toggleLoopMode();
+                              unawaited(playback.toggleLoopMode());
                               FeedbackHelper.feedback(FeedbackType.selection);
                             },
                             onLongPress: () => showRadioMenu(
@@ -1250,7 +1248,7 @@ class NextUpSectionHeader extends StatelessWidget {
 
   @override
   Widget build(context) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return Container(
       // color: Colors.black.withValues(alpha: 0.5),
@@ -1273,7 +1271,7 @@ class NextUpSectionHeader extends StatelessWidget {
               iconSize: 32.0,
               iconColor: Theme.brightnessOf(context) == Brightness.light ? Colors.black : Colors.white,
               onPressed: () {
-                queueService.clearNextUp();
+                unawaited(playback.clearNextUp());
                 FeedbackHelper.feedback(FeedbackType.success);
               },
             ),

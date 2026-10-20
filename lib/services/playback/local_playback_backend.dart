@@ -18,21 +18,21 @@ class LocalPlaybackBackend implements PlaybackBackend {
   final QueueService _queueService;
 
   @override
-  Future<void> play() => _audioHandler.playLocal();
+  Future<void> play() => _audioHandler.play();
   @override
-  Future<void> pause() => _audioHandler.pauseLocal();
+  Future<void> pause() => _audioHandler.pause();
   @override
-  Future<void> togglePlayback() => _audioHandler.togglePlaybackLocal();
+  Future<void> togglePlayback() => _audioHandler.togglePlayback();
   @override
-  Future<void> stop() => _audioHandler.stopLocal();
+  Future<void> stop() => _audioHandler.stop();
   @override
-  Future<void> skipToNext() => _audioHandler.skipToNextLocal();
+  Future<void> skipToNext() => _audioHandler.skipToNext();
   @override
-  Future<void> skipToPrevious({bool forceSkip = false}) => _audioHandler.skipToPreviousLocal(forceSkip: forceSkip);
+  Future<void> skipToPrevious({bool forceSkip = false}) => _audioHandler.skipToPrevious(forceSkip: forceSkip);
   @override
-  Future<void> seek(Duration position) => _audioHandler.seekLocal(position);
+  Future<void> seek(Duration position) => _audioHandler.seek(position);
   @override
-  Future<void> setVolume(double volume) async => _audioHandler.setVolumeLocal(volume);
+  Future<void> setVolume(double volume) async => _audioHandler.setVolume(volume);
 
   @override
   Future<void> startPlayback({
@@ -42,7 +42,7 @@ class LocalPlaybackBackend implements PlaybackBackend {
     FinampPlaybackOrder? order,
     int? startingIndex,
     bool skipRadioCacheInvalidation = false,
-  }) => _queueService.startPlaybackLocal(
+  }) => _queueService.startPlayback(
     items: items,
     source: source,
     customTrackSource: customTrackSource,
@@ -51,46 +51,45 @@ class LocalPlaybackBackend implements PlaybackBackend {
     skipRadioCacheInvalidation: skipRadioCacheInvalidation,
   );
   @override
-  Future<void> startSlicePlayback(PlayableSlice slice) => _queueService.startSlicePlaybackLocal(slice);
+  Future<void> startSlicePlayback(PlayableSlice slice) => _queueService.startSlicePlayback(slice);
   @override
-  Future<void> addToQueue(PlayableSlice slice) => _queueService.addToQueueLocal(slice);
+  Future<void> addToQueue(PlayableSlice slice) => _queueService.addToQueue(slice);
   @override
-  Future<void> addNext(PlayableSlice slice) => _queueService.addNextLocal(slice);
+  Future<void> addNext(PlayableSlice slice) => _queueService.addNext(slice);
   @override
-  Future<void> addToNextUp(PlayableSlice slice) => _queueService.addToNextUpLocal(slice);
+  Future<void> addToNextUp(PlayableSlice slice) => _queueService.addToNextUp(slice);
   @override
-  Future<void> skipByOffset(int offset) => _queueService.skipByOffsetLocal(offset);
+  Future<void> skipByOffset(int offset) => _queueService.skipByOffset(offset);
   @override
-  Future<void> removeAtOffset(int offset) => _queueService.removeAtOffsetLocal(offset);
+  Future<void> removeAtOffset(int offset) => _queueService.removeAtOffset(offset);
   @override
-  Future<void> reorderByOffset(int oldOffset, int newOffset) =>
-      _queueService.reorderByOffsetLocal(oldOffset, newOffset);
+  Future<void> reorderByOffset(int oldOffset, int newOffset) => _queueService.reorderByOffset(oldOffset, newOffset);
   @override
-  Future<void> clearNextUp() => _queueService.clearNextUpLocal();
+  Future<void> clearNextUp() => _queueService.clearNextUp();
 
   @override
-  Future<void> setLoopMode(FinampLoopMode mode) async => _queueService.setLoopModeLocal(mode);
+  Future<void> setLoopMode(FinampLoopMode mode) async => _queueService.loopMode = mode;
   @override
   Future<void> setPlaybackOrder(FinampPlaybackOrder order, {List<int>? shuffleOrder}) =>
-      _queueService.setPlaybackOrderLocal(order, shuffleOrder: shuffleOrder);
+      _queueService.setPlaybackOrder(order, shuffleOrder: shuffleOrder);
   @override
-  Future<void> toggleLoopMode() async => _queueService.toggleLoopModeLocal();
+  Future<void> toggleLoopMode() async => _queueService.toggleLoopMode();
   @override
-  Future<void> togglePlaybackOrder() => _queueService.togglePlaybackOrderLocal();
+  Future<void> togglePlaybackOrder() => _queueService.togglePlaybackOrder();
 
   @override
   bool supports(PlaybackCapability capability) => true;
 
   @override
-  ValueStream<FinampQueueItem?> get currentTrack => _queueService.localCurrentTrack;
+  ValueStream<FinampQueueItem?> get currentTrack => _queueService.getCurrentTrackStream();
   @override
-  ValueStream<FinampQueueInfo?> get queue => _queueService.localQueue;
+  ValueStream<FinampQueueInfo?> get queue => _queueService.getQueueStream();
   @override
-  ValueStream<FinampLoopMode> get loopMode => _queueService.localLoopMode;
+  ValueStream<FinampLoopMode> get loopMode => _queueService.getLoopModeStream();
   @override
-  ValueStream<FinampPlaybackOrder> get playbackOrder => _queueService.localPlaybackOrder;
+  ValueStream<FinampPlaybackOrder> get playbackOrder => _queueService.getPlaybackOrderStream();
   @override
-  ValueStream<PlaybackState> get playbackState => _audioHandler.localPlaybackState;
+  ValueStream<PlaybackState> get playbackState => _audioHandler.playbackState;
   @override
-  ValueStream<MediaItem?> get mediaItem => _audioHandler.localMediaItem;
+  ValueStream<MediaItem?> get mediaItem => _audioHandler.mediaItem;
 }

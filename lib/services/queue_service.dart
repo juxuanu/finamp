@@ -19,8 +19,6 @@ import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
 import 'package:finamp/services/music_player_background_task.dart';
-import 'package:finamp/services/playback/playback_backend.dart';
-import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/playback_history_service.dart';
 import 'package:finamp/services/radio_service_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -115,7 +113,7 @@ class QueueService {
 
     final finampSettings = FinampSettingsHelper.finampSettings;
 
-    setLoopModeLocal(finampSettings.loopMode);
+    loopMode = finampSettings.loopMode;
     _queueServiceLogger.info("Restored loop mode to $loopMode from settings");
 
     playbackSpeed = finampSettings.playbackSpeed;
@@ -271,7 +269,7 @@ class QueueService {
     if (allTracks.isEmpty) {
       _queueServiceLogger.info("Queue is empty");
       _currentTrack = null;
-      _audioHandler.localPlaybackState.add(
+      _audioHandler.playbackState.add(
         PlaybackState(
           processingState: AudioProcessingState.idle,
           playing: false,
@@ -304,9 +302,9 @@ class QueueService {
           final packageInfo = await PackageInfo.fromPlatform();
           artUri = Uri(scheme: "content", host: packageInfo.packageName, path: artUri.path);
         }
-        if (!force && _audioHandler.localMediaItem.valueOrNull?.id != currentMediaItem?.id) return;
+        if (!force && _audioHandler.mediaItem.valueOrNull?.id != currentMediaItem?.id) return;
         currentMediaItem = currentMediaItem?.copyWith(artUri: artUri);
-        _audioHandler.localMediaItem.add(currentMediaItem);
+        _audioHandler.mediaItem.add(currentMediaItem);
       }
 
       _latestAlbumImage?.close();
@@ -658,31 +656,11 @@ class QueueService {
     }
   }
 
-  /// The active playback backend: this device's player or a remote session ("Play On").
-  /// Public queue operations go there; the `...Local` variants always act on this device.
-  PlaybackBackend get _backend => GetIt.instance<PlaybackController>().backend;
-
   // TODO cut more/all usages of this over to startSlicePlayback
   Future<void> startPlayback({
     required List<jellyfin_models.BaseItemDto> items,
     required QueueItemSource source,
     // Only used for radio startup
-    QueueItemSource? customTrackSource,
-    FinampPlaybackOrder? order,
-    int? startingIndex,
-    bool skipRadioCacheInvalidation = false,
-  }) => _backend.startPlayback(
-    items: items,
-    source: source,
-    customTrackSource: customTrackSource,
-    order: order,
-    startingIndex: startingIndex,
-    skipRadioCacheInvalidation: skipRadioCacheInvalidation,
-  );
-
-  Future<void> startPlaybackLocal({
-    required List<jellyfin_models.BaseItemDto> items,
-    required QueueItemSource source,
     QueueItemSource? customTrackSource,
     FinampPlaybackOrder? order,
     int? startingIndex,
@@ -704,9 +682,7 @@ class QueueService {
     _queueServiceLogger.info("Items for queue: [${items.map((e) => e.name).join(", ")}]");
   }
 
-  Future<void> startSlicePlayback(PlayableSlice slice) => _backend.startSlicePlayback(slice);
-
-  Future<void> startSlicePlaybackLocal(PlayableSlice slice) => _startSlicePlayback(slice: slice);
+  Future<void> startSlicePlayback(PlayableSlice slice) async => _startSlicePlayback(slice: slice);
 
   Future<void> _startSlicePlayback({required PlayableSlice slice, bool beginPlaying = true}) async {
     switch (slice) {
@@ -880,7 +856,7 @@ class QueueService {
         // Server activity reporting: pause() sends a progress update (paused state)
         // rather than a stop event; when the new queue starts, onTrackChanged fires
         // and correctly reports the old track stopped + new track started.
-        await _audioHandler.pauseLocal();
+        await _audioHandler.pause();
       }
       await _audioHandler.clearFinampQueueItems();
 
@@ -923,13 +899,13 @@ class QueueService {
 
       // set playback order to trigger shuffle if necessary (fixes indices being wrong when starting with shuffle enabled)
       // this will run _queueFromConcatenatingAudioSource();
-      await setPlaybackOrderLocal(order, shuffleOrder: shuffleOrder);
+      await setPlaybackOrder(order, shuffleOrder: shuffleOrder);
 
       if (beginPlaying) {
         // don't await this, because it will not return until playback is finished
-        unawaited(_audioHandler.playLocal(disableFade: true));
+        unawaited(_audioHandler.play(disableFade: true));
       } else if (!Platform.isAndroid && !Platform.isIOS) {
-        unawaited(_audioHandler.pauseLocal(disableFade: true));
+        unawaited(_audioHandler.pause(disableFade: true));
       }
     } catch (e) {
       _queueServiceLogger.severe("Error while initializing queue: $e", e);
@@ -990,9 +966,7 @@ class QueueService {
     return;
   }
 
-  Future<void> addToQueue(PlayableSlice slice) => _backend.addToQueue(slice);
-
-  Future<void> addToQueueLocal(PlayableSlice slice) async {
+  Future<void> addToQueue(PlayableSlice slice) async {
     if (_audioHandler.audioSources.isEmpty) {
       return _startSlicePlayback(slice: slice, beginPlaying: false);
     }
@@ -1027,9 +1001,7 @@ class QueueService {
     }
   }
 
-  Future<void> addNext(PlayableSlice slice) => _backend.addNext(slice);
-
-  Future<void> addNextLocal(PlayableSlice slice) async {
+  Future<void> addNext(PlayableSlice slice) async {
     if (_audioHandler.audioSources.isEmpty) {
       return _startSlicePlayback(slice: slice, beginPlaying: false);
     }
@@ -1065,9 +1037,7 @@ class QueueService {
     }
   }
 
-  Future<void> addToNextUp(PlayableSlice slice) => _backend.addToNextUp(slice);
-
-  Future<void> addToNextUpLocal(PlayableSlice slice) async {
+  Future<void> addToNextUp(PlayableSlice slice) async {
     if (_audioHandler.audioSources.isEmpty) {
       return _startSlicePlayback(slice: slice, beginPlaying: false);
     }
@@ -1159,15 +1129,11 @@ class QueueService {
     _buildQueueFromNativePlayerQueue(); // update internal queues
   }
 
-  Future<void> skipByOffset(int offset) => _backend.skipByOffset(offset);
-
-  Future<void> skipByOffsetLocal(int offset) async {
+  Future<void> skipByOffset(int offset) async {
     await _audioHandler.skipByOffset(offset);
   }
 
-  Future<void> removeAtOffset(int offset) => _backend.removeAtOffset(offset);
-
-  Future<void> removeAtOffsetLocal(int offset) async {
+  Future<void> removeAtOffset(int offset) async {
     int adjustedQueueIndex = getActualIndexByLinearIndex(_currentQueueIndex + offset);
 
     await _audioHandler.removeFinampQueueItemAt(adjustedQueueIndex);
@@ -1260,12 +1226,10 @@ class QueueService {
     if (offset == null) {
       return;
     }
-    return removeAtOffsetLocal(offset);
+    return removeAtOffset(offset);
   }
 
-  Future<void> reorderByOffset(int oldOffset, int newOffset) => _backend.reorderByOffset(oldOffset, newOffset);
-
-  Future<void> reorderByOffsetLocal(int oldOffset, int newOffset) async {
+  Future<void> reorderByOffset(int oldOffset, int newOffset) async {
     _queueServiceLogger.fine("Reordering queue item at offset $oldOffset to offset $newOffset");
 
     if (playbackOrder == FinampPlaybackOrder.shuffled) {
@@ -1288,9 +1252,7 @@ class QueueService {
     _buildQueueFromNativePlayerQueue();
   }
 
-  Future<void> clearNextUp() => _backend.clearNextUp();
-
-  Future<void> clearNextUpLocal() async {
+  Future<void> clearNextUp() async {
     int adjustedQueueIndex = getActualIndexByLinearIndex(_currentQueueIndex);
 
     // remove all items from Next Up
@@ -1305,7 +1267,6 @@ class QueueService {
     _buildQueueFromNativePlayerQueue(); // update internal queues
   }
 
-  /// This device's queue, whatever backend is active. Use [getQueueStream] for the active backend's queue.
   FinampQueueInfo getQueue() {
     return FinampQueueInfo(
       id: _order.id,
@@ -1319,14 +1280,9 @@ class QueueService {
     );
   }
 
-  PlaybackController get _controller => GetIt.instance<PlaybackController>();
-
-  /// The queue of the active playback backend (this device or a remote session).
-  /// Use [localQueue] or [getQueue] for this device's queue specifically.
-  ValueStream<FinampQueueInfo?> getQueueStream() => _controller.queue;
-
-  /// This device's queue, whatever backend is active.
-  ValueStream<FinampQueueInfo?> get localQueue => _queueStream;
+  BehaviorSubject<FinampQueueInfo?> getQueueStream() {
+    return _queueStream;
+  }
 
   static final _queueInfoStreamProvider = StreamProvider<FinampQueueInfo?>((ref) {
     final service = GetIt.instance<QueueService>();
@@ -1373,26 +1329,22 @@ class QueueService {
     return nextTracks;
   }
 
-  /// The playback order of the active playback backend (this device or a remote session).
-  ValueStream<FinampPlaybackOrder> getPlaybackOrderStream() => _controller.playbackOrder;
+  BehaviorSubject<FinampPlaybackOrder> getPlaybackOrderStream() {
+    return _playbackOrderStream;
+  }
 
-  /// The loop mode of the active playback backend (this device or a remote session).
-  ValueStream<FinampLoopMode> getLoopModeStream() => _controller.loopMode;
+  BehaviorSubject<FinampLoopMode> getLoopModeStream() {
+    return _loopModeStream;
+  }
 
   BehaviorSubject<double> getPlaybackSpeedStream() {
     return _playbackSpeedStream;
   }
 
-  /// The current track of the active playback backend (this device or a remote session).
-  /// Use [localCurrentTrack] or [getCurrentTrack] for this device's track specifically.
-  ValueStream<FinampQueueItem?> getCurrentTrackStream() => _controller.currentTrack;
+  BehaviorSubject<FinampQueueItem?> getCurrentTrackStream() {
+    return _currentTrackStream;
+  }
 
-  // This device's state, whatever backend is active
-  ValueStream<FinampQueueItem?> get localCurrentTrack => _currentTrackStream;
-  ValueStream<FinampLoopMode> get localLoopMode => _loopModeStream;
-  ValueStream<FinampPlaybackOrder> get localPlaybackOrder => _playbackOrderStream;
-
-  /// This device's current track, whatever backend is active.
   FinampQueueItem? getCurrentTrack() {
     return _currentTrack;
   }
@@ -1420,9 +1372,7 @@ class QueueService {
 
   double get playbackPitch => _playbackPitch;
 
-  set loopMode(FinampLoopMode mode) => unawaited(_backend.setLoopMode(mode));
-
-  void setLoopModeLocal(FinampLoopMode mode) {
+  set loopMode(FinampLoopMode mode) {
     _loopMode = mode;
 
     _loopModeStream.add(mode);
@@ -1446,10 +1396,7 @@ class QueueService {
 
   FinampLoopMode get loopMode => _loopMode;
 
-  Future<void> setPlaybackOrder(FinampPlaybackOrder order, {List<int>? shuffleOrder}) =>
-      _backend.setPlaybackOrder(order, shuffleOrder: shuffleOrder);
-
-  Future<void> setPlaybackOrderLocal(FinampPlaybackOrder order, {List<int>? shuffleOrder}) async {
+  Future<void> setPlaybackOrder(FinampPlaybackOrder order, {List<int>? shuffleOrder}) async {
     _playbackOrder = order;
     _queueServiceLogger.fine("Playback order set to $order");
 
@@ -1482,14 +1429,15 @@ class QueueService {
 
   FinampPlaybackOrder get playbackOrder => _playbackOrder;
 
-  Future<void> togglePlaybackOrder() => _backend.togglePlaybackOrder();
+  Future<void> togglePlaybackOrder() {
+    if (_playbackOrder == FinampPlaybackOrder.shuffled) {
+      return setPlaybackOrder(FinampPlaybackOrder.linear);
+    } else {
+      return setPlaybackOrder(FinampPlaybackOrder.shuffled);
+    }
+  }
 
-  Future<void> togglePlaybackOrderLocal() => setPlaybackOrderLocal(_playbackOrder.toggled);
-
-  void toggleLoopMode() => unawaited(_backend.toggleLoopMode());
-
-  /// Cycles this device's loop mode. The radio, a feature of this device's queue, is disabled by toggling.
-  void toggleLoopModeLocal() {
+  void toggleLoopMode() {
     final radioMode = FinampSettingsHelper.finampSettings.radioMode;
     final radioEnabled = FinampSettingsHelper.finampSettings.radioEnabled;
     final radioSeed = _providers.read(getActiveRadioSeedProvider(radioMode));
@@ -1502,11 +1450,17 @@ class QueueService {
     }
     // if the radio was active, we also reset the loop mode
     if (radioActive) {
-      setLoopModeLocal(FinampLoopMode.none);
+      loopMode = FinampLoopMode.none;
       return;
     }
 
-    setLoopModeLocal(_loopMode.next);
+    if (_loopMode == FinampLoopMode.all) {
+      loopMode = FinampLoopMode.one;
+    } else if (_loopMode == FinampLoopMode.one) {
+      loopMode = FinampLoopMode.none;
+    } else {
+      loopMode = FinampLoopMode.all;
+    }
   }
 
   Logger get queueServiceLogger => _queueServiceLogger;

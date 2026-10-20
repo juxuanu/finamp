@@ -12,6 +12,7 @@ import 'package:split_view/split_view.dart';
 
 import '../../models/finamp_models.dart';
 import '../../screens/player_screen.dart';
+import '../../services/playback/playback_controller.dart';
 import '../../services/queue_service.dart';
 
 // TODO this should probably be a notifier?  It does seem to force a rebuild of all relevent widgets, so it
@@ -42,6 +43,7 @@ Widget buildPlayerSplitScreenScaffold(BuildContext context, Widget? widget) {
         return widget!;
       }
       final queueService = GetIt.instance<QueueService>();
+      final playback = GetIt.instance<PlaybackController>();
       // Minimum player width is 275.  Minimum menu width is 400.
       _controller = SplitViewController(
         limits: [WeightLimit(min: 400 / constraints.maxWidth, max: 1.0 - (275 / constraints.maxWidth))],
@@ -54,7 +56,7 @@ Widget buildPlayerSplitScreenScaffold(BuildContext context, Widget? widget) {
             builder: (context, ref, child) {
               bool allowSplitScreen = ref.watch(finampSettingsProvider.allowSplitScreen);
               return StreamBuilder<FinampQueueInfo?>(
-                stream: queueService.getQueueStream(),
+                stream: playback.queue,
                 initialData: queueService.getQueue(),
                 builder: (context, snapshot) {
                   if (snapshot.hasData &&

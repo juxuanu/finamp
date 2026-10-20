@@ -2,7 +2,7 @@ import 'package:balanced_text/balanced_text.dart';
 import 'package:finamp/components/PlayerScreen/queue_source_helper.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
-import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
@@ -18,17 +18,17 @@ class PlayerScreenAppBarTitle extends StatefulWidget {
 }
 
 class _PlayerScreenAppBarTitleState extends State<PlayerScreenAppBarTitle> {
-  final QueueService _queueService = GetIt.instance<QueueService>();
+  final PlaybackController _playback = GetIt.instance<PlaybackController>();
 
   @override
   Widget build(BuildContext context) {
-    final currentTrackStream = _queueService.getCurrentTrackStream();
+    final currentTrackStream = _playback.currentTrack;
 
     final screenWidth = MediaQuery.widthOf(context);
 
     return StreamBuilder<FinampQueueItem?>(
       stream: currentTrackStream,
-      initialData: _queueService.getCurrentTrack(),
+      initialData: _playback.currentTrack.valueOrNull,
       builder: (context, snapshot) {
         if (snapshot.data == null) {
           return const SizedBox.shrink();

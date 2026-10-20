@@ -11,6 +11,7 @@ import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
 import 'jellyfin_api_helper.dart';
 import 'music_screen_provider.dart';
+import 'playback/playback_controller.dart';
 import 'queue_service.dart';
 
 class AndroidAutoSearchQuery {
@@ -253,7 +254,7 @@ class AndroidAutoHelper {
     final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
     final finampUserHelper = GetIt.instance<FinampUserHelper>();
     final audioServiceHelper = GetIt.instance<AudioServiceHelper>();
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     if (searchQuery.rawQuery.isEmpty) {
       return await shuffleAllTracks();
@@ -339,7 +340,7 @@ class AndroidAutoHelper {
 
           _androidAutoHelperLogger.info("Playing playlist: ${playlist.name} (${items?.length} tracks)");
 
-          await queueService.startPlayback(
+          await playback.startPlayback(
             items: items ?? [],
             source: QueueItemSource(
               type: QueueItemSourceType.playlist,
@@ -431,7 +432,7 @@ class AndroidAutoHelper {
         }
         _androidAutoHelperLogger.info("Playing album: ${album.name} (${items?.length} tracks)");
 
-        await queueService.startPlayback(
+        await playback.startPlayback(
           items: items ?? [],
           source: QueueItemSource(
             type: QueueItemSourceType.album,
@@ -453,7 +454,7 @@ class AndroidAutoHelper {
             ),
           );
 
-          await queueService.startPlayback(
+          await playback.startPlayback(
             items: parentBaseItems,
             source: QueueItemSource(
               type: QueueItemSourceType.artist,
@@ -489,7 +490,7 @@ class AndroidAutoHelper {
 
           final indexOfSelected = items.indexWhere((element) => element.id == selectedResult.id);
 
-          return await queueService.startPlayback(
+          return await playback.startPlayback(
             items: items,
             startingIndex: indexOfSelected,
             source: QueueItemSource(
@@ -548,8 +549,8 @@ class AndroidAutoHelper {
   Future<void> playFromMediaId(MediaItemId itemId) async {
     final audioServiceHelper = GetIt.instance<AudioServiceHelper>();
     final finampUserHelper = GetIt.instance<FinampUserHelper>();
-    // queue service should be initialized by time we get here
-    final queueService = GetIt.instance<QueueService>();
+    // playback services should be initialized by time we get here
+    final playback = GetIt.instance<PlaybackController>();
 
     // shouldn't happen, but just in case
     if (!_isPlayable(contentType: itemId.contentType)) {
@@ -579,7 +580,7 @@ class AndroidAutoHelper {
 
         final indexOfSelected = items.indexWhere((element) => element.id == itemId.itemId);
 
-        return await queueService.startPlayback(
+        return await playback.startPlayback(
           items: items,
           startingIndex: indexOfSelected,
           source: QueueItemSource(
@@ -608,7 +609,7 @@ class AndroidAutoHelper {
       if (FinampSettingsHelper.finampSettings.isOffline || parentItem == null) {
         final parentBaseItems = await getBaseItems(itemId);
 
-        return await queueService.startPlayback(
+        return await playback.startPlayback(
           items: parentBaseItems,
           source: QueueItemSource(
             type: QueueItemSourceType.artist,
@@ -625,7 +626,7 @@ class AndroidAutoHelper {
 
     final parentBaseItems = await getBaseItems(itemId);
 
-    await queueService.startPlayback(
+    await playback.startPlayback(
       items: parentBaseItems,
       source: QueueItemSource(
         type: itemId.contentType == ContentType.playlists ? QueueItemSourceType.playlist : QueueItemSourceType.album,

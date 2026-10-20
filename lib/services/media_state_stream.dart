@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:rxdart/rxdart.dart';
 
 import 'music_player_background_task.dart';
+import 'playback/playback_controller.dart';
 
 class MediaState {
   final MediaItem? mediaItem;
@@ -17,9 +18,10 @@ class MediaState {
 /// current position.
 Stream<MediaState> get mediaStateStream {
   final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
+  final playback = GetIt.instance<PlaybackController>();
   return Rx.combineLatest3<MediaItem?, PlaybackState, FadeDirection, MediaState>(
-    audioHandler.mediaItem,
-    audioHandler.playbackState,
+    playback.mediaItem,
+    playback.playbackState,
     audioHandler.fadeState.map((x) => x.fadeDirection).distinct(),
     (mediaItem, playbackState, fadeState) => MediaState(mediaItem, playbackState, fadeState),
   );
@@ -27,10 +29,11 @@ Stream<MediaState> get mediaStateStream {
 
 final mediaStateProvider = StreamProvider.autoDispose<MediaState>((_) => mediaStateStream).select((v) {
   final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
+  final playback = GetIt.instance<PlaybackController>();
   return v.valueOrNull ??
       MediaState(
-        audioHandler.mediaItem.valueOrNull,
-        audioHandler.playbackState.value,
+        playback.mediaItem.valueOrNull,
+        playback.playbackState.value,
         audioHandler.fadeState.value.fadeDirection,
       );
 });

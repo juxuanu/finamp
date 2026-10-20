@@ -49,10 +49,11 @@ class PlayerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     // close the player screen if the queue is empty
     StreamSubscription<FinampQueueInfo?>? listener;
-    listener = queueService.getQueueStream().listen((currentQueue) {
+    listener = playback.queue.listen((currentQueue) {
       if (!context.mounted) {
         listener?.cancel();
         return;
@@ -72,8 +73,8 @@ class PlayerScreen extends StatelessWidget {
 
     return PlayerScreenTheme(
       child: StreamBuilder<FinampQueueInfo?>(
-        stream: queueService.getQueueStream(),
-        initialData: queueService.getQueue(),
+        stream: playback.queue,
+        initialData: playback.queue.valueOrNull,
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data!.saveState == SavedQueueState.loading) {
             return buildLoadingScreen(context, null);

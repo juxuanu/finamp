@@ -67,15 +67,14 @@ class PlaybackHistoryService {
       return;
     }
 
-    // Only this device's playback is reported, never a remote session controlled via "Play On"
-    _queueService.localQueue.listen((queueInfo) {
+    _queueService.getQueueStream().listen((queueInfo) {
       if (queueInfo?.currentTrack == null && _currentTrack != null) {
         // playback stopped
         onPlaybackStopped();
       }
     });
 
-    _audioService.localPlaybackState.listen((event) {
+    _audioService.playbackState.listen((event) {
       final prevPlayback = _previousPlayback;
       final prevState = prevPlayback?.state;
       final prevItem = _currentTrack?.item;

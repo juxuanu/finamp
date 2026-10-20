@@ -8,6 +8,7 @@ import 'package:finamp/screens/queue_restore_screen.dart';
 import 'package:finamp/services/audio_service_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/item_by_id_provider.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +26,7 @@ class QuickActionsService {
   static Future<void> handleAction(QuickActionConfig action, BuildContext context) async {
     final audioServiceHelper = GetIt.instance<AudioServiceHelper>();
     final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     _quickActionsServiceLogger.info("Handling quick action: $action");
     switch (action.action) {
@@ -73,7 +75,7 @@ class QuickActionsService {
         if (item == null) {
           GlobalSnackbar.message((_) => "Failed to load item '${action.itemName}*'");
         } else {
-          await queueService.startPlayback(
+          await playback.startPlayback(
             items: await loadChildTracksFromBaseItem(
               item: item,
               sortConfig: SortAndFilterConfiguration.defaultForItem(item),

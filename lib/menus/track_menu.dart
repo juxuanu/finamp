@@ -120,6 +120,7 @@ class TrackMenu extends ConsumerStatefulWidget {
 class _TrackMenuState extends ConsumerState<TrackMenu> with TickerProviderStateMixin {
   final _audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
   final _queueService = GetIt.instance<QueueService>();
+  final _playback = GetIt.instance<PlaybackController>();
 
   // Makes sure that widget doesn't just disappear after press while menu is visible
   bool speedWidgetWasVisible = false;
@@ -288,8 +289,8 @@ class _TrackMenuState extends ConsumerState<TrackMenu> with TickerProviderStateM
       if (widget.showPlaybackControls) ...[
         StreamBuilder<PlaybackBehaviorInfo>(
           stream: Rx.combineLatest3(
-            _queueService.getPlaybackOrderStream(),
-            _queueService.getLoopModeStream(),
+            _playback.playbackOrder,
+            _playback.loopMode,
             _queueService.getPlaybackSpeedStream(),
             (a, b, c) => PlaybackBehaviorInfo(a, b, c),
           ),
@@ -323,7 +324,7 @@ class _TrackMenuState extends ConsumerState<TrackMenu> with TickerProviderStateM
                 PlaybackAction(
                   icon: playbackOrderIcons[playbackBehavior.order]!,
                   onPressed: () async {
-                    await _queueService.togglePlaybackOrder();
+                    await _playback.togglePlaybackOrder();
                   },
                   label: playbackOrderTooltips[playbackBehavior.order]!,
                   iconColor: playbackBehavior.order == FinampPlaybackOrder.shuffled
@@ -386,7 +387,7 @@ class _TrackMenuState extends ConsumerState<TrackMenu> with TickerProviderStateM
                       );
                       return;
                     }
-                    _queueService.toggleLoopMode();
+                    unawaited(_playback.toggleLoopMode());
                   },
                   onLongPress: () => showRadioMenu(
                     context,

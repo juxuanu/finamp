@@ -18,6 +18,7 @@ import 'package:get_it/get_it.dart';
 
 import '../../services/media_state_stream.dart';
 import '../../services/music_player_background_task.dart';
+import '../../services/playback/playback_controller.dart';
 
 class PlayerButtons extends ConsumerWidget {
   const PlayerButtons(this.controller, {super.key});
@@ -26,7 +27,7 @@ class PlayerButtons extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
+    final playback = GetIt.instance<PlaybackController>();
 
     final showPauseButton = ref.watch(
       mediaStateProvider.select((x) => x.playbackState.playing && x.fadeDirection != FadeDirection.fadeOut),
@@ -53,7 +54,7 @@ class PlayerButtons extends ConsumerWidget {
             icon: const Icon(TablerIcons.player_skip_back),
             onPressed: () async {
               FeedbackHelper.feedback(FeedbackType.light);
-              await audioHandler.skipToPrevious();
+              await playback.skipToPrevious();
             },
           ),
         ),
@@ -70,7 +71,7 @@ class PlayerButtons extends ConsumerWidget {
             borderRadius: BorderRadius.circular(controller.shouldShow(PlayerHideable.bigPlayButton) ? 16 : 12),
             onTap: () {
               FeedbackHelper.feedback(FeedbackType.light);
-              unawaited(audioHandler.togglePlayback());
+              unawaited(playback.togglePlayback());
             },
             label: AppLocalizations.of(context)!.togglePlaybackButtonTooltip,
             tooltip: getStringComponentsInLocaleOrder(context, [
@@ -102,7 +103,7 @@ class PlayerButtons extends ConsumerWidget {
             icon: const Icon(TablerIcons.player_skip_forward),
             onPressed: () async {
               FeedbackHelper.feedback(FeedbackType.light);
-              await audioHandler.skipToNext();
+              await playback.skipToNext();
             },
           ),
         ),

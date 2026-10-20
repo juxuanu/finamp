@@ -13,6 +13,7 @@ import 'package:finamp/models/jellyfin_models.dart';
 import 'package:finamp/services/current_track_metadata_provider.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/music_player_background_task.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/progress_state_stream.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -565,7 +566,7 @@ class _LyricLineTextState extends ConsumerState<_LyricLineText> {
       isCurrentLine = isCurrent;
       cueStream?.cancel();
       if (widget._useCues) {
-        _updateTextFromCues(GetIt.instance<MusicPlayerBackgroundTask>().playbackState.value.position.inMicroseconds);
+        _updateTextFromCues(GetIt.instance<PlaybackController>().playbackState.value.position.inMicroseconds);
         cueStream = progressStateStream.listen((state) => _updateTextFromCues(state.position.inMicroseconds));
       } else {
         _updateTextWithoutCues();
