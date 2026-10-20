@@ -673,6 +673,10 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   }
 
   void setVolume(final double volume) async {
+    final remoteControl = _remoteControl;
+    if (remoteControl != null && remoteControl.isControlling) {
+      return remoteControl.setVolume(volume);
+    }
     return _volume.setInternalVolume(volume);
   }
 
@@ -1193,6 +1197,10 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   }
 
   Future<void> refreshPlaybackStateAndMediaNotification() async {
+    final remoteControl = _remoteControl;
+    if (remoteControl != null && remoteControl.isControlling) {
+      return remoteControl.refreshPlaybackState();
+    }
     // re-trigger the playbackState update to update the notification
     final event = _transformEvent(_player.playbackEvent);
     return playbackState.add(event);

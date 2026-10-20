@@ -326,6 +326,14 @@ abstract class JellyfinApi extends ChopperService {
     @Query() int? startIndex,
   });
 
+  /// Sends a general command (e.g. "SetVolume", "SetRepeatMode") with its arguments to a remote session.
+  @FactoryConverter(request: JsonConverter.requestFactory)
+  @POST(path: "/Sessions/{sessionId}/Command")
+  Future<dynamic> sendGeneralCommand({
+    @Path() required String sessionId,
+    @Body() required Map<String, dynamic> command,
+  });
+
   /// Sends a playstate command (e.g. "PlayPause", "NextTrack") to a remote session.
   @FactoryConverter(request: JsonConverter.requestFactory)
   @POST(path: "/Sessions/{sessionId}/Playing/{command}", optionalBody: true)

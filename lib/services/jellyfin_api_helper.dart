@@ -802,13 +802,22 @@ class JellyfinApiHelper {
     int startIndex = 0,
   }) async {
     assert(_verifyCallable());
-    // Item ids are sent as a query parameter, so cap the amount to keep the URL short enough
     await jellyfinApi.playOnSession(
       sessionId: sessionId,
       playCommand: playCommand,
-      itemIds: itemIds.take(200).join(","),
+      itemIds: itemIds.join(","),
       startIndex: startIndex,
     );
+  }
+
+  /// Sends a general command (e.g. "SetVolume", "SetRepeatMode") with its [arguments] to a remote session.
+  Future<void> sendGeneralCommand({
+    required String sessionId,
+    required String name,
+    Map<String, String> arguments = const {},
+  }) async {
+    assert(_verifyCallable());
+    await jellyfinApi.sendGeneralCommand(sessionId: sessionId, command: {"Name": name, "Arguments": arguments});
   }
 
   /// Sends a playstate command (e.g. "PlayPause", "NextTrack", "Seek") to a remote session.

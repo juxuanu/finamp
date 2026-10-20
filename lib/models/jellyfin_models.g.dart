@@ -436,13 +436,14 @@ class SessionInfoAdapter extends TypeAdapter<SessionInfo> {
       supportsMediaControl: fields[25] as bool,
       nowPlayingQueue: (fields[26] as List?)?.cast<QueueItem>(),
       hasCustomDeviceName: fields[27] as bool,
+      nowPlayingQueueFullItems: (fields[28] as List?)?.cast<BaseItemDto>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, SessionInfo obj) {
     writer
-      ..writeByte(28)
+      ..writeByte(29)
       ..writeByte(0)
       ..write(obj.playState)
       ..writeByte(1)
@@ -498,7 +499,9 @@ class SessionInfoAdapter extends TypeAdapter<SessionInfo> {
       ..writeByte(26)
       ..write(obj.nowPlayingQueue)
       ..writeByte(27)
-      ..write(obj.hasCustomDeviceName);
+      ..write(obj.hasCustomDeviceName)
+      ..writeByte(28)
+      ..write(obj.nowPlayingQueueFullItems);
   }
 
   @override
@@ -533,13 +536,14 @@ class PlayerStateInfoAdapter extends TypeAdapter<PlayerStateInfo> {
       mediaSourceId: fields[7] as String?,
       playMethod: fields[8] as String?,
       repeatMode: fields[9] as String?,
+      playbackOrder: fields[10] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, PlayerStateInfo obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.positionTicks)
       ..writeByte(1)
@@ -559,7 +563,9 @@ class PlayerStateInfoAdapter extends TypeAdapter<PlayerStateInfo> {
       ..writeByte(8)
       ..write(obj.playMethod)
       ..writeByte(9)
-      ..write(obj.repeatMode);
+      ..write(obj.repeatMode)
+      ..writeByte(10)
+      ..write(obj.playbackOrder);
   }
 
   @override
@@ -3297,6 +3303,9 @@ SessionInfo _$SessionInfoFromJson(Map json) => SessionInfo(
       ?.map((e) => QueueItem.fromJson(Map<String, dynamic>.from(e as Map)))
       .toList(),
   hasCustomDeviceName: json['HasCustomDeviceName'] as bool,
+  nowPlayingQueueFullItems: (json['NowPlayingQueueFullItems'] as List<dynamic>?)
+      ?.map((e) => BaseItemDto.fromJson(Map<String, dynamic>.from(e as Map)))
+      .toList(),
 );
 
 Map<String, dynamic> _$SessionInfoToJson(
@@ -3330,6 +3339,9 @@ Map<String, dynamic> _$SessionInfoToJson(
   'SupportsMediaControl': instance.supportsMediaControl,
   'NowPlayingQueue': instance.nowPlayingQueue?.map((e) => e.toJson()).toList(),
   'HasCustomDeviceName': instance.hasCustomDeviceName,
+  'NowPlayingQueueFullItems': instance.nowPlayingQueueFullItems
+      ?.map((e) => e.toJson())
+      .toList(),
 };
 
 TranscodingInfo _$TranscodingInfoFromJson(Map json) => TranscodingInfo(
@@ -3376,6 +3388,7 @@ PlayerStateInfo _$PlayerStateInfoFromJson(Map json) => PlayerStateInfo(
   mediaSourceId: json['MediaSourceId'] as String?,
   playMethod: json['PlayMethod'] as String?,
   repeatMode: json['RepeatMode'] as String?,
+  playbackOrder: json['PlaybackOrder'] as String?,
 );
 
 Map<String, dynamic> _$PlayerStateInfoToJson(PlayerStateInfo instance) =>
@@ -3390,6 +3403,7 @@ Map<String, dynamic> _$PlayerStateInfoToJson(PlayerStateInfo instance) =>
       'MediaSourceId': instance.mediaSourceId,
       'PlayMethod': instance.playMethod,
       'RepeatMode': instance.repeatMode,
+      'PlaybackOrder': instance.playbackOrder,
     };
 
 SessionUserInfo _$SessionUserInfoFromJson(Map json) => SessionUserInfo(

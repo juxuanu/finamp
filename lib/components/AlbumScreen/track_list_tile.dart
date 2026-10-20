@@ -435,7 +435,7 @@ class QueueListTile extends StatelessWidget {
         TrackListItemFeatures.duration,
         TrackListItemFeatures.addToPlaylistOrFavorite,
         TrackListItemFeatures.swipeableInTrackList,
-        TrackListItemFeatures.swipeableInQueue,
+        onRemoveFromList != null ? TrackListItemFeatures.swipeableInQueue : null,
         allowReorder ? TrackListItemFeatures.dragHandle : null,
       ].nonNulls.toList(),
     );

@@ -31,6 +31,7 @@ import 'package:finamp/services/media_state_stream.dart';
 import 'package:finamp/services/music_player_background_task.dart';
 import 'package:finamp/services/process_artist.dart';
 import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/remote_control_service.dart';
 import 'package:finamp/services/radio_service_helper.dart';
 import 'package:finamp/services/theme_provider.dart';
 import 'package:finamp/services/widget_bindings_observer_provider.dart';
@@ -43,6 +44,9 @@ import 'package:get_it/get_it.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../../extensions/localizations.dart';
+
+/// Whether the queue panel shows a remote-controlled session's queue, which can't be edited
+bool get _isRemoteControlled => GetIt.instance<RemoteControlService>().isControlling;
 
 class QueueListStreamState {
   QueueListStreamState(this.mediaState, this.queueInfo);
@@ -468,15 +472,17 @@ class _PreviousTracksListState extends State<PreviousTracksList> with TickerProv
                   isInPlaylist: queueItemInPlaylist(item),
                   parentItem: item.source.item,
                   queueItem: item,
-                  allowReorder: true,
+                  allowReorder: !_isRemoteControlled,
                   onTap: (bool playable) async {
                     FeedbackHelper.feedback(FeedbackType.selection);
                     await _queueService.skipByOffset(indexOffset);
                     scrollToKey(key: widget.previousTracksHeaderKey, duration: const Duration(milliseconds: 500));
                   },
-                  onRemoveFromList: () {
-                    unawaited(_queueService.removeAtOffset(indexOffset));
-                  },
+                  onRemoveFromList: _isRemoteControlled
+                      ? null
+                      : () {
+                          unawaited(_queueService.removeAtOffset(indexOffset));
+                        },
                 );
               },
             );
@@ -554,10 +560,12 @@ class _NextUpTracksListState extends State<NextUpTracksList> {
                     isInPlaylist: queueItemInPlaylist(item),
                     parentItem: item.source.item,
                     queueItem: item,
-                    allowReorder: true,
-                    onRemoveFromList: () {
-                      unawaited(_queueService.removeAtOffset(indexOffset));
-                    },
+                    allowReorder: !_isRemoteControlled,
+                    onRemoveFromList: _isRemoteControlled
+                        ? null
+                        : () {
+                            unawaited(_queueService.removeAtOffset(indexOffset));
+                          },
                     onTap: (bool playable) async {
                       FeedbackHelper.feedback(FeedbackType.selection);
                       await _queueService.skipByOffset(indexOffset);
@@ -644,10 +652,12 @@ class _QueueTracksListState extends ConsumerState<QueueTracksList> {
                   isInPlaylist: queueItemInPlaylist(item),
                   parentItem: item.source.item,
                   queueItem: item,
-                  allowReorder: true,
-                  onRemoveFromList: () {
-                    unawaited(_queueService.removeAtOffset(indexOffset));
-                  },
+                  allowReorder: !_isRemoteControlled,
+                  onRemoveFromList: _isRemoteControlled
+                      ? null
+                      : () {
+                          unawaited(_queueService.removeAtOffset(indexOffset));
+                        },
                   onTap: (bool playable) async {
                     FeedbackHelper.feedback(FeedbackType.selection);
                     await _queueService.skipByOffset(indexOffset);

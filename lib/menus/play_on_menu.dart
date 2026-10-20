@@ -2,10 +2,12 @@ import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/components/themed_bottom_sheet.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/menus/components/icon_button_with_semantics.dart';
+import 'package:finamp/menus/output_menu.dart';
 import 'package:finamp/models/jellyfin_models.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
+import 'package:finamp/services/playon_service.dart';
 import 'package:finamp/services/remote_control_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +18,7 @@ const playOnMenuRouteName = "/play-on-menu";
 
 /// The other Jellyfin sessions of the current user that can be remote-controlled.
 /// Resolves to an empty list when offline or when the sessions can't be fetched.
-/// Re-fetched whenever the app returns to the foreground.
+/// Fetched when first watched, when the app returns to the foreground and when the Play On menu opens.
 final AutoDisposeFutureProvider<List<SessionInfo>> controllableSessionsProvider = FutureProvider.autoDispose((
   ref,
 ) async {
@@ -37,12 +39,12 @@ class PlayOnButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
+    final isControlling = ref.watch(RemoteControlService.controlledSessionProvider) != null;
     final hasSessions = ref.watch(controllableSessionsProvider).valueOrNull?.isNotEmpty ?? false;
-    if (controlledSession == null && !hasSessions) return const SizedBox.shrink();
+    if (!isControlling && !hasSessions) return const SizedBox.shrink();
     return IconButtonWithSemantics(
       label: AppLocalizations.of(context)!.playOnMenuTitle,
-      icon: controlledSession == null ? Icons.cast : Icons.cast_connected,
+      icon: isControlling ? Icons.cast_connected : Icons.cast,
       iconSize: 28.0,
       onPressed: () => showPlayOnMenu(context: context),
     );
@@ -72,22 +74,38 @@ Future<void> showPlayOnMenu({required BuildContext context}) async {
           ),
           sliver: const PlayOnSessionList(),
         ),
+        const SliverToBoxAdapter(child: PlayOnVolumeSlider()),
       ];
-      return (MediaQuery.heightOf(context) * 0.4, menu);
+      return (MediaQuery.heightOf(context) * 0.5, menu);
     },
   );
 }
 
 /// Lists the other Jellyfin sessions of the current user. Tapping a session
 /// starts controlling it, tapping the controlled session again releases it.
-class PlayOnSessionList extends ConsumerWidget {
+class PlayOnSessionList extends ConsumerStatefulWidget {
   const PlayOnSessionList({super.key});
+
+  @override
+  ConsumerState<PlayOnSessionList> createState() => _PlayOnSessionListState();
+}
+
+class _PlayOnSessionListState extends ConsumerState<PlayOnSessionList> {
+  @override
+  void initState() {
+    super.initState();
+    // Show up-to-date sessions whenever the menu is opened
+    ref.invalidate(controllableSessionsProvider);
+  }
 
   Future<void> _toggleControl(SessionInfo session, bool isControlled) async {
     final remoteControl = GetIt.instance<RemoteControlService>();
     try {
       if (isControlled) {
         await remoteControl.release();
+      } else if (!GetIt.instance<PlayOnService>().isConnected) {
+        GlobalSnackbar.message((context) => AppLocalizations.of(context)!.playOnWebsocketRequired);
+        return;
       } else {
         await remoteControl.control(session);
       }
@@ -98,13 +116,18 @@ class PlayOnSessionList extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final sessions = ref.watch(controllableSessionsProvider);
-    final controlledSessionId = ref.watch(RemoteControlService.controlledSessionProvider)?.id;
-    if (sessions.isLoading) {
+    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
+    if (sessions.isLoading && !sessions.hasValue) {
       return const SliverToBoxAdapter(child: Center(heightFactor: 2.0, child: CircularProgressIndicator.adaptive()));
     }
-    final sessionList = sessions.valueOrNull ?? [];
+    final sessionList = [...sessions.valueOrNull ?? <SessionInfo>[]];
+    // Always list the controlled session, with its live state
+    if (controlledSession != null) {
+      sessionList.removeWhere((session) => session.id == controlledSession.id);
+      sessionList.insert(0, controlledSession);
+    }
     if (sessionList.isEmpty) {
       return SliverToBoxAdapter(
         child: Padding(
@@ -120,7 +143,7 @@ class PlayOnSessionList extends ConsumerWidget {
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         final session = sessionList[index];
-        final isControlled = session.id == controlledSessionId;
+        final isControlled = session.id == controlledSession?.id;
         final nowPlaying = session.nowPlayingItem?.name;
         return ListTile(
           selected: isControlled,
@@ -138,6 +161,24 @@ class PlayOnSessionList extends ConsumerWidget {
           onTap: () => _toggleControl(session, isControlled),
         );
       }, childCount: sessionList.length),
+    );
+  }
+}
+
+/// Volume of the controlled session. Hidden while controlling local playback.
+class PlayOnVolumeSlider extends ConsumerWidget {
+  const PlayOnVolumeSlider({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
+    if (controlledSession == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16.0),
+      child: VolumeSlider(
+        initialValue: (controlledSession.playState?.volumeLevel ?? 100) / 100.0,
+        onChange: (value) => GetIt.instance<RemoteControlService>().setVolume(value),
+      ),
     );
   }
 }

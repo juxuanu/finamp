@@ -1156,10 +1156,15 @@ class QueueService {
   }
 
   Future<void> skipByOffset(int offset) async {
+    if (_remoteControl?.isControlling ?? false) {
+      return _remoteControl!.skipByOffset(offset);
+    }
     await _audioHandler.skipByOffset(offset);
   }
 
   Future<void> removeAtOffset(int offset) async {
+    // Jellyfin has no command for editing a remote session's queue
+    if (_remoteControl?.isControlling ?? false) return;
     int adjustedQueueIndex = getActualIndexByLinearIndex(_currentQueueIndex + offset);
 
     await _audioHandler.removeFinampQueueItemAt(adjustedQueueIndex);
@@ -1256,6 +1261,8 @@ class QueueService {
   }
 
   Future<void> reorderByOffset(int oldOffset, int newOffset) async {
+    // Jellyfin has no command for editing a remote session's queue
+    if (_remoteControl?.isControlling ?? false) return;
     _queueServiceLogger.fine("Reordering queue item at offset $oldOffset to offset $newOffset");
 
     if (playbackOrder == FinampPlaybackOrder.shuffled) {
@@ -1279,6 +1286,8 @@ class QueueService {
   }
 
   Future<void> clearNextUp() async {
+    // Jellyfin has no command for editing a remote session's queue
+    if (_remoteControl?.isControlling ?? false) return;
     int adjustedQueueIndex = getActualIndexByLinearIndex(_currentQueueIndex);
 
     // remove all items from Next Up
@@ -1399,6 +1408,12 @@ class QueueService {
   double get playbackPitch => _playbackPitch;
 
   set loopMode(FinampLoopMode mode) {
+    if (_remoteControl?.isControlling ?? false) {
+      // Show the new mode until the remote session reports it
+      _loopModeStream.add(mode);
+      unawaited(_remoteControl!.setLoopMode(mode));
+      return;
+    }
     _loopMode = mode;
 
     _loopModeStream.add(mode);
@@ -1423,6 +1438,11 @@ class QueueService {
   FinampLoopMode get loopMode => _loopMode;
 
   Future<void> setPlaybackOrder(FinampPlaybackOrder order, {List<int>? shuffleOrder}) async {
+    if (_remoteControl?.isControlling ?? false) {
+      // Show the new order until the remote session reports it
+      _playbackOrderStream.add(order);
+      return _remoteControl!.setShuffle(order == FinampPlaybackOrder.shuffled);
+    }
     _playbackOrder = order;
     _queueServiceLogger.fine("Playback order set to $order");
 
@@ -1456,7 +1476,11 @@ class QueueService {
   FinampPlaybackOrder get playbackOrder => _playbackOrder;
 
   Future<void> togglePlaybackOrder() {
-    if (_playbackOrder == FinampPlaybackOrder.shuffled) {
+    // While remote-controlling, the stream holds the remote session's order
+    final currentOrder = (_remoteControl?.isControlling ?? false)
+        ? _playbackOrderStream.valueOrNull ?? _playbackOrder
+        : _playbackOrder;
+    if (currentOrder == FinampPlaybackOrder.shuffled) {
       return setPlaybackOrder(FinampPlaybackOrder.linear);
     } else {
       return setPlaybackOrder(FinampPlaybackOrder.shuffled);
@@ -1464,6 +1488,15 @@ class QueueService {
   }
 
   void toggleLoopMode() {
+    if (_remoteControl?.isControlling ?? false) {
+      // While remote-controlling, the stream holds the remote session's mode and the radio doesn't apply
+      loopMode = switch (_loopModeStream.valueOrNull ?? _loopMode) {
+        FinampLoopMode.all => FinampLoopMode.one,
+        FinampLoopMode.one => FinampLoopMode.none,
+        FinampLoopMode.none => FinampLoopMode.all,
+      };
+      return;
+    }
     final radioMode = FinampSettingsHelper.finampSettings.radioMode;
     final radioEnabled = FinampSettingsHelper.finampSettings.radioEnabled;
     final radioSeed = _providers.read(getActiveRadioSeedProvider(radioMode));
