@@ -48,6 +48,9 @@ import '../../extensions/localizations.dart';
 /// Whether the queue panel shows a remote-controlled session's queue, which can't be edited
 bool get _isRemoteControlled => GetIt.instance<RemoteControlService>().isControlling;
 
+/// Whether a command such as "SetRepeatMode" can be used (always while controlling local playback)
+bool _remoteSupports(String command) => GetIt.instance<RemoteControlService>().supportsCommand(command);
+
 class QueueListStreamState {
   QueueListStreamState(this.mediaState, this.queueInfo);
 
@@ -431,7 +434,9 @@ class _PreviousTracksListState extends State<PreviousTracksList> with TickerProv
         initialData: _queueService.getQueue(),
         builder: (context, snapshot) {
           if (snapshot.hasData) {
-            _previousTracks ??= snapshot.data!.previousTracks;
+            // Always take the latest list: the local queue mutates the same list in place,
+            // but a mirrored remote queue is a new list on every update
+            _previousTracks = snapshot.data!.previousTracks;
             return SliverReorderableList(
               proxyDecorator: (widget, _, _) => Material(type: MaterialType.transparency, child: widget),
               autoScrollerVelocityScalar: 20.0,
@@ -517,7 +522,7 @@ class _NextUpTracksListState extends State<NextUpTracksList> {
         initialData: _queueService.getQueue(),
         builder: (context, snapshot) {
           if (snapshot.hasData) {
-            _nextUp ??= snapshot.data!.nextUp;
+            _nextUp = snapshot.data!.nextUp;
 
             return SliverPadding(
               padding: const EdgeInsets.only(top: 0.0, left: 8.0, right: 8.0),
@@ -609,8 +614,8 @@ class _QueueTracksListState extends ConsumerState<QueueTracksList> {
         initialData: _queueService.getQueue(),
         builder: (context, snapshot) {
           if (snapshot.hasData) {
-            _queue ??= snapshot.data!.queue;
-            _nextUp ??= snapshot.data!.nextUp;
+            _queue = snapshot.data!.queue;
+            _nextUp = snapshot.data!.nextUp;
 
             return SliverReorderableList(
               proxyDecorator: (widget, _, _) => Material(type: MaterialType.transparency, child: widget),
@@ -1095,67 +1100,71 @@ class QueueSectionHeader extends ConsumerWidget {
                     PlaybackBehaviorInfo? info = snapshot.data;
                     return Row(
                       children: [
-                        IconButtonWithSemantics(
-                          label: info?.order == FinampPlaybackOrder.shuffled
-                              ? AppLocalizations.of(context)!.playbackOrderShuffledButtonTooltip
-                              : AppLocalizations.of(context)!.playbackOrderLinearButtonTooltip,
-                          icon: info?.order == FinampPlaybackOrder.shuffled
-                              ? (TablerIcons.arrows_shuffle)
-                              : (TablerIcons.arrows_right),
-                          iconSize: 28.0,
-                          color: info?.order == FinampPlaybackOrder.shuffled
-                              ? IconTheme.of(context).color!
-                              : (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white).withValues(alpha: 0.85),
-                          visualDensity: VisualDensity.standard,
-                          onPressed: () async {
-                            await queueService.togglePlaybackOrder();
-                            FeedbackHelper.feedback(FeedbackType.selection);
-                            if (queueService.getQueue().nextUp.isNotEmpty) {
-                              scrollToKey(key: nextUpHeaderKey);
-                            } else {
-                              scrollToKey(key: queueHeaderKey);
-                            }
-                          },
-                        ),
-                        IconButtonWithSemantics(
-                          label: radioEnabled
-                              ? AppLocalizations.of(context)!.loopingUnavailableWhileRadioActiveWarning
-                              : switch (info?.loop) {
-                                  FinampLoopMode.none => AppLocalizations.of(context)!.loopModeNoneButtonLabel,
-                                  FinampLoopMode.one => AppLocalizations.of(context)!.loopModeOneButtonLabel,
-                                  FinampLoopMode.all => AppLocalizations.of(context)!.loopModeAllButtonLabel,
-                                  null => AppLocalizations.of(context)!.loopModeNoneButtonLabel,
-                                },
-                          icon: switch (radioEnabled ? null : info?.loop) {
-                            FinampLoopMode.none => TablerIcons.repeat_off,
-                            FinampLoopMode.one => TablerIcons.repeat_once,
-                            FinampLoopMode.all => TablerIcons.repeat,
-                            null => TablerIcons.repeat_off,
-                          },
-                          iconSize: 28.0,
-                          color: radioEnabled
-                              ? (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white).withValues(alpha: 0.3)
-                              : (info?.loop != FinampLoopMode.none
-                                    ? IconTheme.of(context).color!
-                                    : (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white).withValues(
-                                        alpha: 0.85,
-                                      )),
-                          visualDensity: VisualDensity.standard,
-                          onPressed: () {
-                            if (radioEnabled) {
-                              GlobalSnackbar.message(
-                                (scaffold) => AppLocalizations.of(context)!.loopingUnavailableWhileRadioActiveWarning,
-                              );
-                              return;
-                            }
-                            queueService.toggleLoopMode();
-                            FeedbackHelper.feedback(FeedbackType.selection);
-                          },
-                          onLongPress: () => showRadioMenu(
-                            context,
-                            subtitle: AppLocalizations.of(context)!.loopingOverriddenByRadioSubtitle,
+                        if (_remoteSupports("SetShuffleQueue"))
+                          IconButtonWithSemantics(
+                            label: info?.order == FinampPlaybackOrder.shuffled
+                                ? AppLocalizations.of(context)!.playbackOrderShuffledButtonTooltip
+                                : AppLocalizations.of(context)!.playbackOrderLinearButtonTooltip,
+                            icon: info?.order == FinampPlaybackOrder.shuffled
+                                ? (TablerIcons.arrows_shuffle)
+                                : (TablerIcons.arrows_right),
+                            iconSize: 28.0,
+                            color: info?.order == FinampPlaybackOrder.shuffled
+                                ? IconTheme.of(context).color!
+                                : (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white).withValues(
+                                    alpha: 0.85,
+                                  ),
+                            visualDensity: VisualDensity.standard,
+                            onPressed: () async {
+                              await queueService.togglePlaybackOrder();
+                              FeedbackHelper.feedback(FeedbackType.selection);
+                              if (queueService.getQueue().nextUp.isNotEmpty) {
+                                scrollToKey(key: nextUpHeaderKey);
+                              } else {
+                                scrollToKey(key: queueHeaderKey);
+                              }
+                            },
                           ),
-                        ),
+                        if (_remoteSupports("SetRepeatMode"))
+                          IconButtonWithSemantics(
+                            label: radioEnabled
+                                ? AppLocalizations.of(context)!.loopingUnavailableWhileRadioActiveWarning
+                                : switch (info?.loop) {
+                                    FinampLoopMode.none => AppLocalizations.of(context)!.loopModeNoneButtonLabel,
+                                    FinampLoopMode.one => AppLocalizations.of(context)!.loopModeOneButtonLabel,
+                                    FinampLoopMode.all => AppLocalizations.of(context)!.loopModeAllButtonLabel,
+                                    null => AppLocalizations.of(context)!.loopModeNoneButtonLabel,
+                                  },
+                            icon: switch (radioEnabled ? null : info?.loop) {
+                              FinampLoopMode.none => TablerIcons.repeat_off,
+                              FinampLoopMode.one => TablerIcons.repeat_once,
+                              FinampLoopMode.all => TablerIcons.repeat,
+                              null => TablerIcons.repeat_off,
+                            },
+                            iconSize: 28.0,
+                            color: radioEnabled
+                                ? (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white).withValues(alpha: 0.3)
+                                : (info?.loop != FinampLoopMode.none
+                                      ? IconTheme.of(context).color!
+                                      : (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white).withValues(
+                                          alpha: 0.85,
+                                        )),
+                            visualDensity: VisualDensity.standard,
+                            onPressed: () {
+                              if (radioEnabled) {
+                                GlobalSnackbar.message(
+                                  (scaffold) => AppLocalizations.of(context)!.loopingUnavailableWhileRadioActiveWarning,
+                                );
+                                return;
+                              }
+                              queueService.toggleLoopMode();
+                              FeedbackHelper.feedback(FeedbackType.selection);
+                            },
+                            onLongPress: () => showRadioMenu(
+                              context,
+                              subtitle: AppLocalizations.of(context)!.loopingOverriddenByRadioSubtitle,
+                            ),
+                          ),
                         IconButtonWithSemantics(
                           label: radioEnabled
                               ? AppLocalizations.of(context)!.radioModeDisableButtonTitle

@@ -52,6 +52,15 @@ class RemoteControlService {
   bool get isControlling => _session != null;
   SessionInfo? get session => _session;
 
+  /// Whether the controlled session supports a general command such as "SetRepeatMode".
+  /// Always true while controlling local playback.
+  bool supportsCommand(String command) => sessionSupports(_session, command);
+
+  /// Whether [session] supports a general command such as "SetRepeatMode" (true when [session] is null, i.e. local).
+  static bool sessionSupports(SessionInfo? session, String command) =>
+      session == null ||
+      (session.supportedCommands ?? session.capabilities?.supportedCommands ?? const []).contains(command);
+
   /// Starts controlling [session] instead of the local player.
   /// Requires the Play On websocket to be connected, as the session state is pushed through it.
   Future<void> control(SessionInfo session) async {
@@ -157,6 +166,7 @@ class RemoteControlService {
   /// Skips to the queue item [offset] positions away from the current one.
   Future<void> skipByOffset(int offset) async {
     final index = _remoteQueueIndex + offset;
+    _logger.fine("Skipping remote queue by $offset to index $index of ${_remoteItems.length}");
     if (index < 0 || index >= _remoteItems.length) return;
     await play(_remoteItems, startIndex: index);
   }
@@ -256,6 +266,7 @@ class RemoteControlService {
       _remoteItems = items;
       _remoteQueue = queue;
       _remoteQueueIndex = index;
+      _logger.fine("Mirrored remote queue of ${items.length} items, current index $index");
 
       final current = index >= 0 && index < queue.length ? queue[index] : null;
       _queueService.getQueueStream().add(

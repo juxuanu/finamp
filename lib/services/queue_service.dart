@@ -1409,6 +1409,7 @@ class QueueService {
 
   set loopMode(FinampLoopMode mode) {
     if (_remoteControl?.isControlling ?? false) {
+      if (!_remoteControl!.supportsCommand("SetRepeatMode")) return;
       // Show the new mode until the remote session reports it
       _loopModeStream.add(mode);
       unawaited(_remoteControl!.setLoopMode(mode));
@@ -1439,6 +1440,7 @@ class QueueService {
 
   Future<void> setPlaybackOrder(FinampPlaybackOrder order, {List<int>? shuffleOrder}) async {
     if (_remoteControl?.isControlling ?? false) {
+      if (!_remoteControl!.supportsCommand("SetShuffleQueue")) return;
       // Show the new order until the remote session reports it
       _playbackOrderStream.add(order);
       return _remoteControl!.setShuffle(order == FinampPlaybackOrder.shuffled);

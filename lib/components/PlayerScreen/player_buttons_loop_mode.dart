@@ -8,6 +8,7 @@ import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/music_player_background_task.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:finamp/services/radio_service_helper.dart';
+import 'package:finamp/services/remote_control_service.dart';
 import 'package:finamp/utils/locale_helper.dart';
 import 'package:finamp/utils/platform_helper.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,10 @@ class PlayerButtonsLoopMode extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final queueService = GetIt.instance<QueueService>();
+
+    // A remote-controlled session may not support changing the repeat mode
+    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
+    if (!RemoteControlService.sessionSupports(controlledSession, "SetRepeatMode")) return const SizedBox.shrink();
 
     final radioMode = ref.watch(finampSettingsProvider.radioMode);
     final radioEnabled = ref.watch(finampSettingsProvider.radioEnabled);

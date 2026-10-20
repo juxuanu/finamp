@@ -162,7 +162,9 @@ class PlayOnVolumeSlider extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
-    if (controlledSession == null) return const SizedBox.shrink();
+    if (controlledSession == null || !RemoteControlService.sessionSupports(controlledSession, "SetVolume")) {
+      return const SizedBox.shrink();
+    }
     return Padding(
       padding: const EdgeInsets.only(top: 16.0),
       child: VolumeSlider(
