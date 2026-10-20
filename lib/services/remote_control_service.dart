@@ -41,6 +41,7 @@ class RemoteControlService {
   // Mirrored remote state
   BaseItemId? _mirroredItemId;
   String? _mirroredQueueKey;
+  String? _pendingQueueKey;
   final Map<BaseItemId, MediaItem> _mediaItemCache = {};
   List<BaseItemDto> _remoteItems = [];
   List<FinampQueueItem> _remoteQueue = [];
@@ -75,6 +76,7 @@ class RemoteControlService {
     _session = null;
     _mirroredItemId = null;
     _mirroredQueueKey = null;
+    _pendingQueueKey = null;
     _mediaItemCache.clear();
     _remoteItems = [];
     _remoteQueue = [];
@@ -199,70 +201,92 @@ class RemoteControlService {
 
   Future<void> _mirrorQueue(SessionInfo session) async {
     final ids = session.nowPlayingQueue?.map((queueItem) => queueItem.id).toList() ?? [];
-    final key = "${session.playlistItemId}|${session.nowPlayingItem?.id}|${ids.join(",")}";
+    final nowPlaying = session.nowPlayingItem;
+    final key = "${session.playlistItemId}|${nowPlaying?.id}|${ids.join(",")}";
     if (key == _mirroredQueueKey) return;
-    _mirroredQueueKey = key;
+    _pendingQueueKey = key;
 
-    var items = session.nowPlayingQueueFullItems ?? [];
-    if (items.length != ids.length && ids.isNotEmpty) {
-      // Servers before 10.9 don't send the full items
-      final fetched = await _jellyfinApiHelper.getItems(itemIds: ids.map(BaseItemId.new).toList()) ?? [];
-      final byId = {for (final item in fetched) item.id: item};
-      items = ids.map((id) => byId[BaseItemId(id)]).nonNulls.toList();
-    }
-    var index =
-        session.nowPlayingQueue?.indexWhere((queueItem) => queueItem.playlistItemId == session.playlistItemId) ?? -1;
-    if (index < 0 && session.nowPlayingItem != null) {
-      index = items.indexWhere((item) => item.id == session.nowPlayingItem!.id);
-    }
-    final queue = <FinampQueueItem>[];
-    for (final (i, item) in items.indexed) {
-      queue.add(
-        FinampQueueItem(
-          item: await _mediaItemFor(item),
-          source: _remoteSource(item),
-          type: i < index
-              ? QueueItemQueueType.previousTracks
-              : i == index
-              ? QueueItemQueueType.currentTrack
-              : QueueItemQueueType.queue,
+    try {
+      var items = session.nowPlayingQueueFullItems ?? [];
+      if (items.length != ids.length && ids.isNotEmpty) {
+        // Servers before 10.9 don't send the full items
+        final fetched = await _jellyfinApiHelper.getItems(itemIds: ids.map(BaseItemId.new).toList()) ?? [];
+        final byId = {for (final item in fetched) item.id: item};
+        items = ids.map((id) => byId[BaseItemId(id)]).nonNulls.toList();
+      }
+      var index = -1;
+      if (session.playlistItemId != null) {
+        index =
+            session.nowPlayingQueue?.indexWhere((queueItem) => queueItem.playlistItemId == session.playlistItemId) ??
+            -1;
+      }
+      if (index < 0 && nowPlaying != null) {
+        index = items.indexWhere((item) => item.id == nowPlaying.id);
+      }
+      if (index < 0 && nowPlaying != null) {
+        // The client reports no queue, or one without the current track, so show at least the current track
+        items = [nowPlaying, ...items];
+        index = 0;
+      }
+      final queue = <FinampQueueItem>[];
+      for (final (i, item) in items.indexed) {
+        queue.add(
+          FinampQueueItem(
+            item: await _mediaItemFor(item),
+            source: _remoteSource(item),
+            type: i < index
+                ? QueueItemQueueType.previousTracks
+                : i == index
+                ? QueueItemQueueType.currentTrack
+                : QueueItemQueueType.queue,
+          ),
+        );
+      }
+      // The session may have changed while generating the media items
+      if (_pendingQueueKey != key) return;
+      _mirroredQueueKey = key;
+      _remoteItems = items;
+      _remoteQueue = queue;
+      _remoteQueueIndex = index;
+
+      final current = index >= 0 && index < queue.length ? queue[index] : null;
+      _queueService.getQueueStream().add(
+        FinampQueueInfo(
+          id: session.id ?? "",
+          previousTracks: current == null ? [] : queue.sublist(0, index),
+          currentTrack: current,
+          nextUp: [],
+          queue: current == null ? queue : queue.sublist(index + 1),
+          source: _remoteSource(nowPlaying),
+          saveState: SavedQueueState.saving,
+          sourceLibrary: null,
         ),
       );
+    } catch (e) {
+      // Not caching the key, so the next session update retries
+      _logger.warning("Failed to mirror the remote queue: $e");
     }
-    // The session may have changed while generating the media items
-    if (_mirroredQueueKey != key) return;
-    _remoteItems = items;
-    _remoteQueue = queue;
-    _remoteQueueIndex = index;
-
-    final current = index >= 0 && index < queue.length ? queue[index] : null;
-    _queueService.getQueueStream().add(
-      FinampQueueInfo(
-        id: session.id ?? "",
-        previousTracks: current == null ? [] : queue.sublist(0, index),
-        currentTrack: current,
-        nextUp: [],
-        queue: current == null ? queue : queue.sublist(index + 1),
-        source: _remoteSource(session.nowPlayingItem),
-        saveState: SavedQueueState.saving,
-        sourceLibrary: null,
-      ),
-    );
   }
 
   Future<void> _mirrorTrack(SessionInfo session) async {
     final item = session.nowPlayingItem;
     if (item?.id == _mirroredItemId) return;
-    _mirroredItemId = item?.id;
     FinampQueueItem? queueItem;
-    if (item != null) {
-      final current = _remoteQueueIndex >= 0 && _remoteQueueIndex < _remoteQueue.length
-          ? _remoteQueue[_remoteQueueIndex]
-          : null;
-      queueItem = current?.baseItemId == item.id
-          ? current
-          : FinampQueueItem(item: await _mediaItemFor(item), source: _remoteSource(item));
+    try {
+      if (item != null) {
+        final current = _remoteQueueIndex >= 0 && _remoteQueueIndex < _remoteQueue.length
+            ? _remoteQueue[_remoteQueueIndex]
+            : null;
+        queueItem = current?.baseItemId == item.id
+            ? current
+            : FinampQueueItem(item: await _mediaItemFor(item), source: _remoteSource(item));
+      }
+    } catch (e) {
+      // Not caching the id, so the next session update retries
+      _logger.warning("Failed to mirror the remote track: $e");
+      return;
     }
+    _mirroredItemId = item?.id;
     _queueService.getCurrentTrackStream().add(queueItem);
     _audioHandler.mediaItem.add(queueItem?.item);
   }
