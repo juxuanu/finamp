@@ -56,7 +56,8 @@ import 'package:finamp/services/offline_listen_helper.dart';
 import 'package:finamp/services/playback_history_service.dart';
 import 'package:finamp/services/playon_service.dart';
 import 'package:finamp/services/queue_service.dart';
-import 'package:finamp/services/remote_control_service.dart';
+import 'package:finamp/services/playback/local_playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/theme_provider.dart';
 import 'package:finamp/services/ui_overlay_setter_observer.dart';
 import 'package:finamp/services/widget_bindings_observer_provider.dart';
@@ -169,8 +170,6 @@ Future<void> main(List<String> args, {bool integrationTesting = false, bool logi
     _mainLog.info("Setup PlayOnService");
     await _setupPlaybackServices();
     _mainLog.info("Setup audio player");
-    GetIt.instance.registerSingleton(RemoteControlService());
-    _mainLog.info("Setup RemoteControlService");
     await _setupKeepScreenOnHelper();
     _mainLog.info("Setup KeepScreenOnHelper");
     await _setupDiscordRpc();
@@ -472,6 +471,17 @@ Future<void> _setupPlaybackServices() async {
   GetIt.instance.registerSingleton<MusicPlayerBackgroundTask>(audioHandler);
   var queueService = QueueService();
   GetIt.instance.registerSingleton(queueService);
+  // The controller must exist before anything reads the queue service's streams, which follow the active backend
+  GetIt.instance.registerSingleton(
+    PlaybackController(
+      local: LocalPlaybackBackend(audioHandler: audioHandler, queueService: queueService),
+      audioHandler: audioHandler,
+      queueService: queueService,
+      jellyfinApiHelper: GetIt.instance<JellyfinApiHelper>(),
+      playOnService: GetIt.instance<PlayOnService>(),
+      providers: GetIt.instance<ProviderContainer>(),
+    ),
+  );
   audioHandler.onQueueServiceAvailable(); // breaking circular dependency
   GetIt.instance.registerSingleton(PlaybackHistoryService());
   GetIt.instance.registerSingleton(AudioServiceHelper());

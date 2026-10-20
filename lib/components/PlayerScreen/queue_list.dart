@@ -31,7 +31,8 @@ import 'package:finamp/services/media_state_stream.dart';
 import 'package:finamp/services/music_player_background_task.dart';
 import 'package:finamp/services/process_artist.dart';
 import 'package:finamp/services/queue_service.dart';
-import 'package:finamp/services/remote_control_service.dart';
+import 'package:finamp/services/playback/playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/radio_service_helper.dart';
 import 'package:finamp/services/theme_provider.dart';
 import 'package:finamp/services/widget_bindings_observer_provider.dart';
@@ -45,11 +46,11 @@ import 'package:rxdart/rxdart.dart';
 
 import '../../extensions/localizations.dart';
 
-/// Whether the queue panel shows a remote-controlled session's queue, which can't be edited
-bool get _isRemoteControlled => GetIt.instance<RemoteControlService>().isControlling;
-
-/// Whether a command such as "SetRepeatMode" can be used (always while controlling local playback)
-bool _remoteSupports(String command) => GetIt.instance<RemoteControlService>().supportsCommand(command);
+/// Whether the active playback backend supports [capability]. A remote-controlled
+/// session may not, e.g. its queue can't be edited. The lists rebuild from the
+/// queue stream, which emits whenever the backend switches.
+bool _backendSupports(PlaybackCapability capability) =>
+    GetIt.instance<PlaybackController>().backend.supports(capability);
 
 class QueueListStreamState {
   QueueListStreamState(this.mediaState, this.queueInfo);
@@ -477,13 +478,13 @@ class _PreviousTracksListState extends State<PreviousTracksList> with TickerProv
                   isInPlaylist: queueItemInPlaylist(item),
                   parentItem: item.source.item,
                   queueItem: item,
-                  allowReorder: !_isRemoteControlled,
+                  allowReorder: _backendSupports(PlaybackCapability.editQueue),
                   onTap: (bool playable) async {
                     FeedbackHelper.feedback(FeedbackType.selection);
                     await _queueService.skipByOffset(indexOffset);
                     scrollToKey(key: widget.previousTracksHeaderKey, duration: const Duration(milliseconds: 500));
                   },
-                  onRemoveFromList: _isRemoteControlled
+                  onRemoveFromList: !_backendSupports(PlaybackCapability.editQueue)
                       ? null
                       : () {
                           unawaited(_queueService.removeAtOffset(indexOffset));
@@ -565,8 +566,8 @@ class _NextUpTracksListState extends State<NextUpTracksList> {
                     isInPlaylist: queueItemInPlaylist(item),
                     parentItem: item.source.item,
                     queueItem: item,
-                    allowReorder: !_isRemoteControlled,
-                    onRemoveFromList: _isRemoteControlled
+                    allowReorder: _backendSupports(PlaybackCapability.editQueue),
+                    onRemoveFromList: !_backendSupports(PlaybackCapability.editQueue)
                         ? null
                         : () {
                             unawaited(_queueService.removeAtOffset(indexOffset));
@@ -657,8 +658,8 @@ class _QueueTracksListState extends ConsumerState<QueueTracksList> {
                   isInPlaylist: queueItemInPlaylist(item),
                   parentItem: item.source.item,
                   queueItem: item,
-                  allowReorder: !_isRemoteControlled,
-                  onRemoveFromList: _isRemoteControlled
+                  allowReorder: _backendSupports(PlaybackCapability.editQueue),
+                  onRemoveFromList: !_backendSupports(PlaybackCapability.editQueue)
                       ? null
                       : () {
                           unawaited(_queueService.removeAtOffset(indexOffset));
@@ -1100,7 +1101,7 @@ class QueueSectionHeader extends ConsumerWidget {
                     PlaybackBehaviorInfo? info = snapshot.data;
                     return Row(
                       children: [
-                        if (_remoteSupports("SetShuffleQueue"))
+                        if (_backendSupports(PlaybackCapability.setShuffle))
                           IconButtonWithSemantics(
                             label: info?.order == FinampPlaybackOrder.shuffled
                                 ? AppLocalizations.of(context)!.playbackOrderShuffledButtonTooltip
@@ -1125,7 +1126,7 @@ class QueueSectionHeader extends ConsumerWidget {
                               }
                             },
                           ),
-                        if (_remoteSupports("SetRepeatMode"))
+                        if (_backendSupports(PlaybackCapability.setRepeatMode))
                           IconButtonWithSemantics(
                             label: radioEnabled
                                 ? AppLocalizations.of(context)!.loopingUnavailableWhileRadioActiveWarning

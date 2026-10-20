@@ -5,7 +5,8 @@ import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/music_player_background_task.dart';
 import 'package:finamp/services/queue_service.dart';
-import 'package:finamp/services/remote_control_service.dart';
+import 'package:finamp/services/playback/playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/utils/locale_helper.dart';
 import 'package:finamp/utils/platform_helper.dart';
 import 'package:flutter/material.dart';
@@ -22,8 +23,9 @@ class PlayerButtonsPlaybackOrder extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // A remote-controlled session may not support changing the playback order
-    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
-    if (!RemoteControlService.sessionSupports(controlledSession, "SetShuffleQueue")) return const SizedBox.shrink();
+    if (!ref.watch(PlaybackController.backendProvider).supports(PlaybackCapability.setShuffle)) {
+      return const SizedBox.shrink();
+    }
 
     return StreamBuilder(
       stream: _queueService.getPlaybackOrderStream(),

@@ -7,8 +7,9 @@ import 'package:finamp/models/jellyfin_models.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
+import 'package:finamp/services/playback/playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/playon_service.dart';
-import 'package:finamp/services/remote_control_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sticky_header/flutter_sticky_header.dart';
@@ -39,7 +40,7 @@ class PlayOnButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isControlling = ref.watch(RemoteControlService.controlledSessionProvider) != null;
+    final isControlling = ref.watch(PlaybackController.controlledSessionProvider) != null;
     final hasSessions = ref.watch(controllableSessionsProvider).valueOrNull?.isNotEmpty ?? false;
     if (!isControlling && !hasSessions) return const SizedBox.shrink();
     return IconButtonWithSemantics(
@@ -89,15 +90,15 @@ class PlayOnSessionList extends ConsumerWidget {
   const PlayOnSessionList({super.key});
 
   Future<void> _toggleControl(SessionInfo session, bool isControlled) async {
-    final remoteControl = GetIt.instance<RemoteControlService>();
+    final controller = GetIt.instance<PlaybackController>();
     try {
       if (isControlled) {
-        await remoteControl.release();
+        await controller.release();
       } else if (!GetIt.instance<PlayOnService>().isConnected) {
         GlobalSnackbar.message((context) => AppLocalizations.of(context)!.playOnWebsocketRequired);
         return;
       } else {
-        await remoteControl.control(session);
+        await controller.control(session);
       }
       FeedbackHelper.feedback(FeedbackType.selection);
     } catch (e) {
@@ -108,7 +109,7 @@ class PlayOnSessionList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(controllableSessionsProvider);
-    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
+    final controlledSession = ref.watch(PlaybackController.controlledSessionProvider);
     if (sessions.isLoading && !sessions.hasValue) {
       return const SliverToBoxAdapter(child: Center(heightFactor: 2.0, child: CircularProgressIndicator.adaptive()));
     }
@@ -155,21 +156,23 @@ class PlayOnSessionList extends ConsumerWidget {
   }
 }
 
-/// Volume of the controlled session. Hidden while controlling local playback.
+/// Volume of the controlled session. Hidden while controlling local playback
+/// or when the session doesn't support setting the volume.
 class PlayOnVolumeSlider extends ConsumerWidget {
   const PlayOnVolumeSlider({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
-    if (controlledSession == null || !RemoteControlService.sessionSupports(controlledSession, "SetVolume")) {
+    final controlledSession = ref.watch(PlaybackController.controlledSessionProvider);
+    final backend = ref.watch(PlaybackController.backendProvider);
+    if (controlledSession == null || !backend.supports(PlaybackCapability.setVolume)) {
       return const SizedBox.shrink();
     }
     return Padding(
       padding: const EdgeInsets.only(top: 16.0),
       child: VolumeSlider(
         initialValue: (controlledSession.playState?.volumeLevel ?? 100) / 100.0,
-        onChange: (value) => GetIt.instance<RemoteControlService>().setVolume(value),
+        onChange: (value) => backend.setVolume(value),
       ),
     );
   }

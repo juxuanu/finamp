@@ -35,7 +35,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
-import 'package:finamp/services/remote_control_service.dart';
+import 'package:finamp/services/playback/playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -279,9 +280,9 @@ class _TrackMenuState extends ConsumerState<TrackMenu> with TickerProviderStateM
     final currentRadioAvailabilityStatus = ref.watch(currentRadioAvailabilityStatusProvider);
     final radioFailed = ref.watch(radioStateProvider.select((state) => state?.failed ?? false));
     // A remote-controlled session may not support changing the playback order or repeat mode
-    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
-    final supportsShuffle = RemoteControlService.sessionSupports(controlledSession, "SetShuffleQueue");
-    final supportsRepeat = RemoteControlService.sessionSupports(controlledSession, "SetRepeatMode");
+    final backend = ref.watch(PlaybackController.backendProvider);
+    final supportsShuffle = backend.supports(PlaybackCapability.setShuffle);
+    final supportsRepeat = backend.supports(PlaybackCapability.setRepeatMode);
 
     return [
       if (widget.showPlaybackControls) ...[

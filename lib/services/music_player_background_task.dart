@@ -14,7 +14,8 @@ import 'package:finamp/services/favorite_provider.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/playback_history_service.dart';
 import 'package:finamp/services/queue_service.dart';
-import 'package:finamp/services/remote_control_service.dart';
+import 'package:finamp/services/playback/playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/radio_service_helper.dart' as radio_service_helper;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -341,7 +342,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
             case AudioInterruptionType.unknown:
               // Another app started playing audio and we should pause.
               wasPlayingBeforeInterruption = _player.playing;
-              pause();
+              pauseLocal();
               break;
           }
         } else {
@@ -354,7 +355,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
             case AudioInterruptionType.pause:
               // The interruption ended and we should resume.
               if (wasPlayingBeforeInterruption) {
-                play();
+                playLocal();
               }
               break;
             case AudioInterruptionType.unknown:
@@ -369,7 +370,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
           // if this is enabled, we let the [AudioPlayer] handle this automatically, via [handleInterruptions]
         } else {
           // if ducking is disabled, the audio player doesn't handle interruptions on its own, so we need to make sure to pause
-          pause();
+          pauseLocal();
         }
       });
       session.devicesChangedEventStream.listen((event) {
@@ -456,9 +457,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
           }
         }
       }
-      // While remote-controlling another session, its state is mirrored instead
-      if (_remoteControl?.isControlling ?? false) return;
-      playbackState.add(_transformEvent(event));
+      localPlaybackState.add(_transformEvent(event));
     });
 
     double prevIosGain = FinampSettingsHelper.finampSettings.volumeNormalizationIOSBaseGain;
@@ -613,22 +612,21 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   /// Fully dispose the player instance.  Should only be called during app shutdown.
   Future<void> dispose() => _player.dispose();
 
-  /// The remote control service, once it has been registered during startup.
-  RemoteControlService? get _remoteControl =>
-      GetIt.instance.isRegistered<RemoteControlService>() ? GetIt.instance<RemoteControlService>() : null;
+  /// This device's playback state and media item. [PlaybackController] copies
+  /// them into [playbackState] and [mediaItem] (which drive the OS media
+  /// session) while this device is the active backend; a remote session's
+  /// state goes there instead while it is being controlled.
+  final localPlaybackState = BehaviorSubject<PlaybackState>.seeded(PlaybackState());
+  final localMediaItem = BehaviorSubject<MediaItem?>.seeded(null);
 
-  /// Forwards [command] to the remote-controlled session, if there is one.
-  /// Returns true if the command was forwarded and should not be handled locally.
-  Future<bool> _forwardToRemote(String command, {Duration? seekPosition}) async {
-    final remoteControl = _remoteControl;
-    if (remoteControl == null || !remoteControl.isControlling) return false;
-    await remoteControl.sendPlaystateCommand(command, seekPosition: seekPosition);
-    return true;
-  }
+  /// The active playback backend: this device's player or a remote session ("Play On").
+  /// The transport methods the OS and UI call go there; the `...Local` variants always act on this device.
+  PlaybackBackend get _backend => GetIt.instance<PlaybackController>().backend;
 
   @override
-  Future<void> play({bool disableFade = false}) async {
-    if (await _forwardToRemote("Unpause")) return;
+  Future<void> play() => _backend.play();
+
+  Future<void> playLocal({bool disableFade = false}) async {
     _audioServiceBackgroundTaskLogger.info(
       "play() start: disableFade=$disableFade, playing=${_player.playing}, fadeDirection=${fadeState.value.fadeDirection}, currentIndex=${_player.currentIndex}, position=${_player.position}",
     );
@@ -672,17 +670,14 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
     return _player.setPitch(pitch);
   }
 
-  void setVolume(final double volume) async {
-    final remoteControl = _remoteControl;
-    if (remoteControl != null && remoteControl.isControlling) {
-      return remoteControl.setVolume(volume);
-    }
-    return _volume.setInternalVolume(volume);
-  }
+  void setVolume(final double volume) => unawaited(_backend.setVolume(volume));
+
+  void setVolumeLocal(final double volume) => _volume.setInternalVolume(volume);
 
   @override
-  Future<void> pause({bool disableFade = false}) async {
-    if (await _forwardToRemote("Pause")) return;
+  Future<void> pause() => _backend.pause();
+
+  Future<void> pauseLocal({bool disableFade = false}) async {
     _audioServiceBackgroundTaskLogger.info(
       "pause() start: disableFade=$disableFade, playing=${_player.playing}, fadeDirection=${fadeState.value.fadeDirection}, currentIndex=${_player.currentIndex}, position=${_player.position}",
     );
@@ -787,18 +782,20 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
     }
   }
 
-  Future<void> togglePlayback() async {
-    if (await _forwardToRemote("PlayPause")) return;
+  Future<void> togglePlayback() => _backend.togglePlayback();
+
+  Future<void> togglePlaybackLocal() {
     if (_player.playing && fadeState.value.fadeDirection != FadeDirection.fadeOut) {
-      return pause();
+      return pauseLocal();
     } else {
-      return play();
+      return playLocal();
     }
   }
 
   @override
-  Future<void> stop() async {
-    if (await _forwardToRemote("Stop")) return;
+  Future<void> stop() => _backend.stop();
+
+  Future<void> stopLocal() async {
     try {
       _audioServiceBackgroundTaskLogger.info("Audio service received stop command");
 
@@ -833,13 +830,13 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
       _audioServiceBackgroundTaskLogger.info("Queue completed.");
       // A full stop will trigger a re-shuffle with an unshuffled first
       // item, so only pause.
-      await pause(disableFade: true);
+      await pauseLocal(disableFade: true);
       if (FinampSettingsHelper.finampSettings.radioEnabled) {
         // Skipping to zero with empty queue re-triggers queue complete event
         // while radio is enable, we should never reach the end of the queue
         // if we end up reaching it, e.g. because the current radio mode becomes available (offline, etc.), we want to pause without resetting the queue, so that the user can fix the radio issue and resume, if desired.
         // Seek back a bit to avoid resetting the track to position zero when the queue is updated
-        await seek(playbackPosition - Duration(milliseconds: 500));
+        await seekLocal(playbackPosition - Duration(milliseconds: 500));
       } else {
         if (_player.effectiveIndices.isNotEmpty) {
           await skipToIndex(0);
@@ -856,8 +853,9 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   }
 
   @override
-  Future<void> skipToPrevious({bool forceSkip = false}) async {
-    if (await _forwardToRemote("PreviousTrack")) return;
+  Future<void> skipToPrevious({bool forceSkip = false}) => _backend.skipToPrevious(forceSkip: forceSkip);
+
+  Future<void> skipToPreviousLocal({bool forceSkip = false}) async {
     _audioServiceBackgroundTaskLogger.fine(
       "skipToPrevious() start: forceSkip=$forceSkip, playing=${_player.playing}, fadeDirection=${fadeState.value.fadeDirection}, hasPrevious=${_player.hasPrevious}, loopMode=${_player.loopMode}, currentIndex=${_player.currentIndex}, position=${_player.position}",
     );
@@ -893,8 +891,9 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   }
 
   @override
-  Future<void> skipToNext() async {
-    if (await _forwardToRemote("NextTrack")) return;
+  Future<void> skipToNext() => _backend.skipToNext();
+
+  Future<void> skipToNextLocal() async {
     _audioServiceBackgroundTaskLogger.fine(
       "skipToNext() start: playing=${_player.playing}, fadeDirection=${fadeState.value.fadeDirection}, hasNext=${_player.hasNext}, loopMode=${_player.loopMode}, currentIndex=${_player.currentIndex}, position=${_player.position}",
     );
@@ -955,8 +954,9 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   }
 
   @override
-  Future<void> seek(Duration position) async {
-    if (await _forwardToRemote("Seek", seekPosition: position)) return;
+  Future<void> seek(Duration position) => _backend.seek(position);
+
+  Future<void> seekLocal(Duration position) async {
     try {
       await _player.seek(position);
     } catch (e) {
@@ -1197,13 +1197,9 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   }
 
   Future<void> refreshPlaybackStateAndMediaNotification() async {
-    final remoteControl = _remoteControl;
-    if (remoteControl != null && remoteControl.isControlling) {
-      return remoteControl.refreshPlaybackState();
-    }
     // re-trigger the playbackState update to update the notification
     final event = _transformEvent(_player.playbackEvent);
-    return playbackState.add(event);
+    return localPlaybackState.add(event);
   }
 
   // triggers when skipping to specific item in android auto queue
@@ -1251,7 +1247,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   /// Handles a sleep timer triggering, pausing play and clearing the timer
   void completeSleepTimer() {
     _audioServiceBackgroundTaskLogger.info("Sleep timer completed, pausing playback");
-    pause();
+    pauseLocal();
     _timer.value?.cancel();
     _timer.value = null;
     // stop playback reporting, since the playback is not expected to resume in the near future
@@ -1294,9 +1290,9 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
     jellyfin_models.BaseItemDto? currentItem;
     bool isFavorite = false;
 
-    if (mediaItem.valueOrNull?.extras?["itemJson"] != null) {
+    if (localMediaItem.valueOrNull?.extras?["itemJson"] != null) {
       currentItem = jellyfin_models.BaseItemDto.fromJson(
-        mediaItem.valueOrNull?.extras!["itemJson"] as Map<String, dynamic>,
+        localMediaItem.valueOrNull?.extras!["itemJson"] as Map<String, dynamic>,
       );
       isFavorite = GetIt.instance<ProviderContainer>().read(isFavoriteProvider(currentItem));
     }

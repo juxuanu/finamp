@@ -9,8 +9,8 @@ import 'package:finamp/screens/music_screen.dart';
 import 'package:finamp/screens/settings_screen.dart';
 import 'package:finamp/services/favorite_provider.dart';
 import 'package:finamp/services/jellyfin_api.dart';
-import 'package:finamp/services/queue_service.dart';
-import 'package:finamp/services/remote_control_service.dart';
+import 'package:finamp/services/playback/playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
@@ -26,7 +26,6 @@ import 'finamp_user_helper.dart';
 final _playOnServiceLogger = Logger("PlayOnService");
 final _finampUserHelper = GetIt.instance<FinampUserHelper>();
 final _jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
-final _queueService = GetIt.instance<QueueService>();
 final _audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
 late WebSocketChannel _channel;
 StreamSubscription<void>? _keepaliveSubscription;
@@ -236,7 +235,7 @@ class PlayOnService {
 
     _channel.sink.add('{"MessageType":"KeepAlive"}');
     // Resume the session feed if we were remote-controlling a session before (re)connecting
-    _remoteControl?.onSocketConnected();
+    _controller?.onSocketConnected();
 
     _channel.stream.listen(
       _handleMessage,
@@ -263,9 +262,13 @@ class PlayOnService {
 
   bool get isConnected => socketState == SocketState.connected;
 
-  /// The remote control service, once it has been registered during startup.
-  RemoteControlService? get _remoteControl =>
-      GetIt.instance.isRegistered<RemoteControlService>() ? GetIt.instance<RemoteControlService>() : null;
+  /// The playback controller, once it has been registered during startup.
+  PlaybackController? get _controller =>
+      GetIt.instance.isRegistered<PlaybackController>() ? GetIt.instance<PlaybackController>() : null;
+
+  /// Commands received from a client controlling this device always act on this device's player,
+  /// even while this device is itself controlling another session.
+  PlaybackBackend get _local => GetIt.instance<PlaybackController>().local;
 
   /// Sends a raw message to the server over the websocket, if connected.
   void sendMessage(String message) {
@@ -314,7 +317,7 @@ class PlayOnService {
                 _playOnServiceLogger.info("Server requested a volume adjustment");
 
                 final desiredVolume = request['Data']['Arguments']['Volume'] as String;
-                _audioHandler.setVolume(double.parse(desiredVolume) / 100.0);
+                await _local.setVolume(double.parse(desiredVolume) / 100.0);
                 break;
               case "GoToSettings":
                 _playOnServiceLogger.fine("Server requested to open settings");
@@ -338,7 +341,7 @@ class PlayOnService {
             break;
           case "Sessions":
             // Session feed requested with "SessionsStart" while remote-controlling another session
-            await _remoteControl?.onSessionsUpdate(request['Data'] as List<dynamic>);
+            await _controller?.onSessionsUpdate(request['Data'] as List<dynamic>);
             break;
           case "UserDataChanged":
             var item = await _jellyfinApiHelper.getItemById(
@@ -368,26 +371,26 @@ class PlayOnService {
                 });
             switch (request['Data']['Command']) {
               case "Stop":
-                await _audioHandler.stop();
+                await _local.stop();
                 break;
               case "Pause":
-                await _audioHandler.pause();
+                await _local.pause();
                 break;
               case "Unpause":
-                await _audioHandler.play();
+                await _local.play();
                 break;
               case "NextTrack":
-                await _audioHandler.skipToNext();
+                await _local.skipToNext();
                 break;
               case "PreviousTrack":
-                await _audioHandler.skipToPrevious();
+                await _local.skipToPrevious();
                 break;
               case "Seek":
                 // val to = message.data?.seekPositionTicks?.ticks ?: Duration.ZERO
                 final seekPosition = request['Data']['SeekPositionTicks'] != null
                     ? Duration(milliseconds: ((request['Data']['SeekPositionTicks'] as int) / 10000).round())
                     : Duration.zero;
-                await _audioHandler.seek(seekPosition);
+                await _local.seek(seekPosition);
                 break;
               case "Rewind":
                 await _audioHandler.rewind();
@@ -396,7 +399,7 @@ class PlayOnService {
                 await _audioHandler.fastForward();
                 break;
               case "PlayPause":
-                await _audioHandler.togglePlayback();
+                await _local.togglePlayback();
                 break;
 
               // Do nothing
@@ -414,7 +417,7 @@ class PlayOnService {
                     if (items!.isNotEmpty) {
                       //TODO check if all tracks in the request are in the upcoming queue (peekQueue). If they are, we should try to only reorder the upcoming queue instead of treating it as a new queue, and then skip to the correct index.
                       unawaited(
-                        _queueService.startPlayback(
+                        _local.startPlayback(
                           items: items,
                           source: QueueItemSource(
                             name: QueueItemSourceName(type: QueueItemSourceNameType.remoteClient),
@@ -437,7 +440,7 @@ class PlayOnService {
                       itemIds: List<BaseItemId>.from(request['Data']['ItemIds'] as List<dynamic>),
                     );
                     unawaited(
-                      _queueService.addToNextUp(
+                      _local.addToNextUp(
                         PlayableSlice.simple(
                           items!,
                           QueueItemSource(
@@ -457,7 +460,7 @@ class PlayOnService {
                       itemIds: List<BaseItemId>.from(request['Data']['ItemIds'] as List<dynamic>),
                     );
                     unawaited(
-                      _queueService.addToQueue(
+                      _local.addToQueue(
                         PlayableSlice.simple(
                           items!,
                           QueueItemSource(
