@@ -2338,8 +2338,8 @@
     "@playOnWebsocketRequired": {
         "description": "Shown in the Play On menu when another session can't be controlled because the websocket connection to the server is not established"
     },
-    "playOnCastingTo": "Casting to {deviceName}",
-    "@playOnCastingTo": {
+    "playOnPlayingOn": "Playing on {deviceName}",
+    "@playOnPlayingOn": {
         "description": "Label of the player screen button replacing the output button while another Jellyfin session is being remote-controlled",
         "placeholders": {
             "deviceName": {

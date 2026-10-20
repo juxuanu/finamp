@@ -429,7 +429,7 @@ class _PlayerScreenContent extends ConsumerWidget {
                       return SimpleButton(
                         text: AppLocalizations.of(
                           context,
-                        )!.playOnCastingTo(controlledSession.deviceName ?? controlledSession.client ?? ""),
+                        )!.playOnPlayingOn(controlledSession.deviceName ?? controlledSession.client ?? ""),
                         icon: Icons.cast_connected,
                         onPressed: () async {
                           await showPlayOnMenu(context: context);
