@@ -2334,13 +2334,9 @@
             }
         }
     },
-    "playOnTransferQueueTooltip": "Play the current queue on this device",
-    "@playOnTransferQueueTooltip": {
-        "description": "Tooltip for the button that sends the current queue to a remote Jellyfin session"
-    },
-    "playOnQueueTransferred": "Now playing on {deviceName}",
-    "@playOnQueueTransferred": {
-        "description": "Snackbar message shown after the current queue was sent to a remote Jellyfin session",
+    "playOnCastingTo": "Casting to {deviceName}",
+    "@playOnCastingTo": {
+        "description": "Label of the player screen button replacing the output button while another Jellyfin session is being remote-controlled",
         "placeholders": {
             "deviceName": {
                 "type": "String"

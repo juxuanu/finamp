@@ -15,6 +15,7 @@ import 'package:finamp/components/finamp_app_bar_back_button.dart';
 import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/menus/output_menu.dart';
+import 'package:finamp/menus/play_on_menu.dart';
 import 'package:finamp/menus/playlist_actions_menu.dart';
 import 'package:finamp/menus/track_menu.dart';
 import 'package:finamp/models/finamp_models.dart';
@@ -24,6 +25,7 @@ import 'package:finamp/services/current_track_metadata_provider.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/music_player_background_task.dart';
 import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/remote_control_service.dart';
 import 'package:finamp/services/theme_provider.dart';
 import 'package:finamp/utils/platform_helper.dart';
 import 'package:flutter/material.dart';
@@ -419,15 +421,32 @@ class _PlayerScreenContent extends ConsumerWidget {
             children: [
               Flexible(
                 fit: FlexFit.tight,
-                child: SimpleButton(
-                  text: AppLocalizations.of(context)!.outputMenuButtonTitle,
-                  icon: TablerIcons.device_speaker,
-                  onPressed: () async {
-                    await showOutputMenu(context: context);
-                  },
-                  onPressedSecondary: () async {
-                    final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
-                    await audioHandler.openBluetoothSettings();
+                child: Consumer(
+                  builder: (context, ref, child) {
+                    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
+                    // While remote-controlling another session, the local output can't be changed
+                    if (controlledSession != null) {
+                      return SimpleButton(
+                        text: AppLocalizations.of(
+                          context,
+                        )!.playOnCastingTo(controlledSession.deviceName ?? controlledSession.client ?? ""),
+                        icon: Icons.cast_connected,
+                        onPressed: () async {
+                          await showPlayOnMenu(context: context);
+                        },
+                      );
+                    }
+                    return SimpleButton(
+                      text: AppLocalizations.of(context)!.outputMenuButtonTitle,
+                      icon: TablerIcons.device_speaker,
+                      onPressed: () async {
+                        await showOutputMenu(context: context);
+                      },
+                      onPressedSecondary: () async {
+                        final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
+                        await audioHandler.openBluetoothSettings();
+                      },
+                    );
                   },
                 ),
               ),

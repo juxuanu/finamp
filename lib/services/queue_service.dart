@@ -19,6 +19,7 @@ import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
 import 'package:finamp/services/music_player_background_task.dart';
+import 'package:finamp/services/remote_control_service.dart';
 import 'package:finamp/services/playback_history_service.dart';
 import 'package:finamp/services/radio_service_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -666,6 +667,13 @@ class QueueService {
     int? startingIndex,
     bool skipRadioCacheInvalidation = false,
   }) async {
+    if (_remoteControl?.isControlling ?? false) {
+      final shuffled = order == FinampPlaybackOrder.shuffled;
+      return _remoteControl!.play(
+        shuffled ? ([...items]..shuffle()) : items,
+        startIndex: shuffled ? 0 : startingIndex ?? 0,
+      );
+    }
     // _initialQueue = list; // save original PlaybackList for looping/restarting and meta info
 
     await _replaceWholeQueue(
@@ -682,7 +690,17 @@ class QueueService {
     _queueServiceLogger.info("Items for queue: [${items.map((e) => e.name).join(", ")}]");
   }
 
-  Future<void> startSlicePlayback(PlayableSlice slice) async => _startSlicePlayback(slice: slice);
+  Future<void> startSlicePlayback(PlayableSlice slice) async {
+    if (_remoteControl?.isControlling ?? false) {
+      final base = await slice.resolve(preShuffle: true);
+      return _remoteControl!.play(base.items, startIndex: base.startingIndex);
+    }
+    return _startSlicePlayback(slice: slice);
+  }
+
+  /// The remote control service, once it has been registered during startup.
+  RemoteControlService? get _remoteControl =>
+      GetIt.instance.isRegistered<RemoteControlService>() ? GetIt.instance<RemoteControlService>() : null;
 
   Future<void> _startSlicePlayback({required PlayableSlice slice, bool beginPlaying = true}) async {
     switch (slice) {
@@ -967,6 +985,10 @@ class QueueService {
   }
 
   Future<void> addToQueue(PlayableSlice slice) async {
+    if (_remoteControl?.isControlling ?? false) {
+      final base = await slice.resolve(preShuffle: true);
+      return _remoteControl!.play(base.items, playCommand: "PlayLast");
+    }
     if (_audioHandler.audioSources.isEmpty) {
       return _startSlicePlayback(slice: slice, beginPlaying: false);
     }
@@ -1038,6 +1060,10 @@ class QueueService {
   }
 
   Future<void> addToNextUp(PlayableSlice slice) async {
+    if (_remoteControl?.isControlling ?? false) {
+      final base = await slice.resolve(preShuffle: true);
+      return _remoteControl!.play(base.items, playCommand: "PlayNext");
+    }
     if (_audioHandler.audioSources.isEmpty) {
       return _startSlicePlayback(slice: slice, beginPlaying: false);
     }

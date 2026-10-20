@@ -14,6 +14,7 @@ import 'package:finamp/services/favorite_provider.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/playback_history_service.dart';
 import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/remote_control_service.dart';
 import 'package:finamp/services/radio_service_helper.dart' as radio_service_helper;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -455,6 +456,8 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
           }
         }
       }
+      // While remote-controlling another session, its state is mirrored instead
+      if (_remoteControl?.isControlling ?? false) return;
       playbackState.add(_transformEvent(event));
     });
 
@@ -610,8 +613,22 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   /// Fully dispose the player instance.  Should only be called during app shutdown.
   Future<void> dispose() => _player.dispose();
 
+  /// The remote control service, once it has been registered during startup.
+  RemoteControlService? get _remoteControl =>
+      GetIt.instance.isRegistered<RemoteControlService>() ? GetIt.instance<RemoteControlService>() : null;
+
+  /// Forwards [command] to the remote-controlled session, if there is one.
+  /// Returns true if the command was forwarded and should not be handled locally.
+  Future<bool> _forwardToRemote(String command, {Duration? seekPosition}) async {
+    final remoteControl = _remoteControl;
+    if (remoteControl == null || !remoteControl.isControlling) return false;
+    await remoteControl.sendPlaystateCommand(command, seekPosition: seekPosition);
+    return true;
+  }
+
   @override
   Future<void> play({bool disableFade = false}) async {
+    if (await _forwardToRemote("Unpause")) return;
     _audioServiceBackgroundTaskLogger.info(
       "play() start: disableFade=$disableFade, playing=${_player.playing}, fadeDirection=${fadeState.value.fadeDirection}, currentIndex=${_player.currentIndex}, position=${_player.position}",
     );
@@ -661,6 +678,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
 
   @override
   Future<void> pause({bool disableFade = false}) async {
+    if (await _forwardToRemote("Pause")) return;
     _audioServiceBackgroundTaskLogger.info(
       "pause() start: disableFade=$disableFade, playing=${_player.playing}, fadeDirection=${fadeState.value.fadeDirection}, currentIndex=${_player.currentIndex}, position=${_player.position}",
     );
@@ -765,7 +783,8 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
     }
   }
 
-  Future<void> togglePlayback() {
+  Future<void> togglePlayback() async {
+    if (await _forwardToRemote("PlayPause")) return;
     if (_player.playing && fadeState.value.fadeDirection != FadeDirection.fadeOut) {
       return pause();
     } else {
@@ -775,6 +794,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
 
   @override
   Future<void> stop() async {
+    if (await _forwardToRemote("Stop")) return;
     try {
       _audioServiceBackgroundTaskLogger.info("Audio service received stop command");
 
@@ -833,6 +853,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
 
   @override
   Future<void> skipToPrevious({bool forceSkip = false}) async {
+    if (await _forwardToRemote("PreviousTrack")) return;
     _audioServiceBackgroundTaskLogger.fine(
       "skipToPrevious() start: forceSkip=$forceSkip, playing=${_player.playing}, fadeDirection=${fadeState.value.fadeDirection}, hasPrevious=${_player.hasPrevious}, loopMode=${_player.loopMode}, currentIndex=${_player.currentIndex}, position=${_player.position}",
     );
@@ -869,6 +890,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
 
   @override
   Future<void> skipToNext() async {
+    if (await _forwardToRemote("NextTrack")) return;
     _audioServiceBackgroundTaskLogger.fine(
       "skipToNext() start: playing=${_player.playing}, fadeDirection=${fadeState.value.fadeDirection}, hasNext=${_player.hasNext}, loopMode=${_player.loopMode}, currentIndex=${_player.currentIndex}, position=${_player.position}",
     );
@@ -930,6 +952,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
 
   @override
   Future<void> seek(Duration position) async {
+    if (await _forwardToRemote("Seek", seekPosition: position)) return;
     try {
       await _player.seek(position);
     } catch (e) {

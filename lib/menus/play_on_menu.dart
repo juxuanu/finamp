@@ -6,12 +6,10 @@ import 'package:finamp/models/jellyfin_models.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
-import 'package:finamp/services/music_player_background_task.dart';
-import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/remote_control_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sticky_header/flutter_sticky_header.dart';
-import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:get_it/get_it.dart';
 
 const playOnMenuRouteName = "/play-on-menu";
@@ -32,17 +30,19 @@ final AutoDisposeFutureProvider<List<SessionInfo>> controllableSessionsProvider 
   }
 });
 
-/// App bar button opening the "Play On" menu. Only shown when there is at least one controllable session.
+/// App bar button opening the "Play On" menu. Only shown when there is at least
+/// one controllable session, or while a session is being controlled.
 class PlayOnButton extends ConsumerWidget {
   const PlayOnButton({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
     final hasSessions = ref.watch(controllableSessionsProvider).valueOrNull?.isNotEmpty ?? false;
-    if (!hasSessions) return const SizedBox.shrink();
+    if (controlledSession == null && !hasSessions) return const SizedBox.shrink();
     return IconButtonWithSemantics(
       label: AppLocalizations.of(context)!.playOnMenuTitle,
-      icon: TablerIcons.cast,
+      icon: controlledSession == null ? Icons.cast : Icons.cast_connected,
       iconSize: 28.0,
       onPressed: () => showPlayOnMenu(context: context),
     );
@@ -78,39 +78,20 @@ Future<void> showPlayOnMenu({required BuildContext context}) async {
   );
 }
 
-/// Lists the other Jellyfin sessions of the current user and lets the user
-/// remote-control them ("Play On"), or send the current queue to them.
+/// Lists the other Jellyfin sessions of the current user. Tapping a session
+/// starts controlling it, tapping the controlled session again releases it.
 class PlayOnSessionList extends ConsumerWidget {
   const PlayOnSessionList({super.key});
 
-  Future<void> _sendCommand(SessionInfo session, String command) async {
+  Future<void> _toggleControl(SessionInfo session, bool isControlled) async {
+    final remoteControl = GetIt.instance<RemoteControlService>();
     try {
-      await GetIt.instance<JellyfinApiHelper>().sendPlaystateCommand(sessionId: session.id!, command: command);
+      if (isControlled) {
+        await remoteControl.release();
+      } else {
+        await remoteControl.control(session);
+      }
       FeedbackHelper.feedback(FeedbackType.selection);
-    } catch (e) {
-      GlobalSnackbar.error(e);
-    }
-  }
-
-  Future<void> _transferQueue(SessionInfo session) async {
-    final queueService = GetIt.instance<QueueService>();
-    final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
-    // Item ids are sent as a query parameter, so cap the amount to keep the URL short enough
-    final itemIds = queueService.peekQueue(current: true).take(200).map((queueItem) => queueItem.baseItemId).toList();
-    if (itemIds.isEmpty) return;
-    try {
-      final startPosition = audioHandler.playbackPosition;
-      await audioHandler.pause();
-      await GetIt.instance<JellyfinApiHelper>().playOnSession(
-        sessionId: session.id!,
-        itemIds: itemIds,
-        startPosition: startPosition,
-      );
-      FeedbackHelper.feedback(FeedbackType.success);
-      GlobalSnackbar.message(
-        (context) => AppLocalizations.of(context)!.playOnQueueTransferred(session.deviceName ?? session.client ?? ""),
-        isConfirmation: true,
-      );
     } catch (e) {
       GlobalSnackbar.error(e);
     }
@@ -119,6 +100,7 @@ class PlayOnSessionList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(controllableSessionsProvider);
+    final controlledSessionId = ref.watch(RemoteControlService.controlledSessionProvider)?.id;
     if (sessions.isLoading) {
       return const SliverToBoxAdapter(child: Center(heightFactor: 2.0, child: CircularProgressIndicator.adaptive()));
     }
@@ -138,13 +120,12 @@ class PlayOnSessionList extends ConsumerWidget {
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         final session = sessionList[index];
+        final isControlled = session.id == controlledSessionId;
         final nowPlaying = session.nowPlayingItem?.name;
         return ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(16.0),
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-            child: const Icon(TablerIcons.devices),
-          ),
+          selected: isControlled,
+          selectedColor: Theme.of(context).colorScheme.primary,
+          selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
           title: Text(session.deviceName ?? session.client ?? ""),
           subtitle: Text(
             nowPlaying == null
@@ -153,31 +134,8 @@ class PlayOnSessionList extends ConsumerWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(TablerIcons.player_skip_back),
-                tooltip: AppLocalizations.of(context)!.skipToPreviousTrackButtonTooltip,
-                onPressed: () => _sendCommand(session, "PreviousTrack"),
-              ),
-              IconButton(
-                icon: const Icon(TablerIcons.player_play),
-                tooltip: AppLocalizations.of(context)!.togglePlaybackButtonTooltip,
-                onPressed: () => _sendCommand(session, "PlayPause"),
-              ),
-              IconButton(
-                icon: const Icon(TablerIcons.player_skip_forward),
-                tooltip: AppLocalizations.of(context)!.skipToNextTrackButtonTooltip,
-                onPressed: () => _sendCommand(session, "NextTrack"),
-              ),
-              IconButton(
-                icon: const Icon(TablerIcons.cast),
-                tooltip: AppLocalizations.of(context)!.playOnTransferQueueTooltip,
-                onPressed: () => _transferQueue(session),
-              ),
-            ],
-          ),
+          trailing: Icon(isControlled ? Icons.cast_connected : Icons.cast),
+          onTap: () => _toggleControl(session, isControlled),
         );
       }, childCount: sessionList.length),
     );

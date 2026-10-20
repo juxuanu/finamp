@@ -569,9 +569,18 @@ final class _$JellyfinApi extends JellyfinApi {
   Future<dynamic> sendPlaystateCommand({
     required String sessionId,
     required String command,
+    int? seekPositionTicks,
   }) async {
     final Uri $url = Uri.parse('/Sessions/${sessionId}/Playing/${command}');
-    final Request $request = Request('POST', $url, client.baseUrl);
+    final Map<String, dynamic> $params = <String, dynamic>{
+      'seekPositionTicks': seekPositionTicks,
+    };
+    final Request $request = Request(
+      'POST',
+      $url,
+      client.baseUrl,
+      parameters: $params,
+    );
     final Response $response = await client.send<dynamic, dynamic>(
       $request,
       requestConverter: JsonConverter.requestFactory,

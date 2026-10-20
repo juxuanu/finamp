@@ -794,26 +794,35 @@ class JellyfinApiHelper {
         .toList();
   }
 
-  /// Starts playback of [itemIds] on a remote session, starting at [startPosition] of the first item.
+  /// Plays [itemIds] on a remote session. [playCommand] is one of "PlayNow", "PlayNext" or "PlayLast".
   Future<void> playOnSession({
     required String sessionId,
     required List<BaseItemId> itemIds,
-    Duration startPosition = Duration.zero,
+    String playCommand = "PlayNow",
+    int startIndex = 0,
   }) async {
     assert(_verifyCallable());
+    // Item ids are sent as a query parameter, so cap the amount to keep the URL short enough
     await jellyfinApi.playOnSession(
       sessionId: sessionId,
-      playCommand: "PlayNow",
-      itemIds: itemIds.join(","),
-      startPositionTicks: startPosition.inMicroseconds * 10,
-      startIndex: 0,
+      playCommand: playCommand,
+      itemIds: itemIds.take(200).join(","),
+      startIndex: startIndex,
     );
   }
 
-  /// Sends a playstate command (e.g. "PlayPause", "NextTrack", "PreviousTrack") to a remote session.
-  Future<void> sendPlaystateCommand({required String sessionId, required String command}) async {
+  /// Sends a playstate command (e.g. "PlayPause", "NextTrack", "Seek") to a remote session.
+  Future<void> sendPlaystateCommand({
+    required String sessionId,
+    required String command,
+    Duration? seekPosition,
+  }) async {
     assert(_verifyCallable());
-    await jellyfinApi.sendPlaystateCommand(sessionId: sessionId, command: command);
+    await jellyfinApi.sendPlaystateCommand(
+      sessionId: sessionId,
+      command: command,
+      seekPositionTicks: seekPosition == null ? null : seekPosition.inMicroseconds * 10,
+    );
   }
 
   /// Tells the Jellyfin server that playback has started

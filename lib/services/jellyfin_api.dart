@@ -329,7 +329,11 @@ abstract class JellyfinApi extends ChopperService {
   /// Sends a playstate command (e.g. "PlayPause", "NextTrack") to a remote session.
   @FactoryConverter(request: JsonConverter.requestFactory)
   @POST(path: "/Sessions/{sessionId}/Playing/{command}", optionalBody: true)
-  Future<dynamic> sendPlaystateCommand({@Path() required String sessionId, @Path() required String command});
+  Future<dynamic> sendPlaystateCommand({
+    @Path() required String sessionId,
+    @Path() required String command,
+    @Query() int? seekPositionTicks,
+  });
 
   @FactoryConverter(request: JsonConverter.requestFactory)
   @POST(path: "/Sessions/Playing")
