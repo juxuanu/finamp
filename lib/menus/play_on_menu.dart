@@ -18,9 +18,12 @@ const playOnMenuRouteName = "/play-on-menu";
 
 /// The other Jellyfin sessions of the current user that can be remote-controlled.
 /// Resolves to an empty list when offline or when the sessions can't be fetched.
+/// Re-fetched whenever the app returns to the foreground.
 final AutoDisposeFutureProvider<List<SessionInfo>> controllableSessionsProvider = FutureProvider.autoDispose((
   ref,
 ) async {
+  final lifecycleListener = AppLifecycleListener(onResume: ref.invalidateSelf);
+  ref.onDispose(lifecycleListener.dispose);
   if (ref.watch(finampSettingsProvider.isOffline)) return [];
   try {
     return await GetIt.instance<JellyfinApiHelper>().getControllableSessions();
