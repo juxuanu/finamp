@@ -27,10 +27,6 @@ class RemoteControlService {
   /// Jellyfin sends item ids as a query parameter, so play requests are limited to this many items.
   static const _maxPlayItems = 200;
 
-  /// How long a session has to report nothing playing before it's mirrored as stopped.
-  /// The server pushes session updates every 1.5 seconds.
-  static const _stopGracePeriod = Duration(seconds: 4);
-
   /// The session currently being controlled, or null when controlling local playback.
   static final StateProvider<SessionInfo?> controlledSessionProvider = StateProvider((ref) => null);
 
@@ -46,7 +42,6 @@ class RemoteControlService {
   BaseItemId? _mirroredItemId;
   String? _mirroredQueueKey;
   String? _pendingQueueKey;
-  DateTime? _nothingPlayingSince;
   final Map<BaseItemId, MediaItem> _mediaItemCache = {};
   List<BaseItemDto> _remoteItems = [];
   List<FinampQueueItem> _remoteQueue = [];
@@ -82,7 +77,6 @@ class RemoteControlService {
     _mirroredItemId = null;
     _mirroredQueueKey = null;
     _pendingQueueKey = null;
-    _nothingPlayingSince = null;
     _mediaItemCache.clear();
     _remoteItems = [];
     _remoteQueue = [];
@@ -186,14 +180,13 @@ class RemoteControlService {
   // Mirroring
 
   Future<void> _applySession(SessionInfo session) async {
-    // Between tracks, clients briefly report nothing playing. Keep showing the
-    // last track for a moment so the player doesn't flicker, only a lasting
-    // stop is mirrored.
     if (session.nowPlayingItem == null && _mirroredItemId != null) {
-      _nothingPlayingSince ??= DateTime.now();
-      if (DateTime.now().difference(_nothingPlayingSince!) < _stopGracePeriod) return;
-    } else {
-      _nothingPlayingSince = null;
+      // Clients report nothing playing both between tracks and when stopped.
+      // Like the local player at the end of playback, keep the last track on
+      // screen and show it paused; the next track replaces it when it starts.
+      _playing = false;
+      _pushPlaybackState();
+      return;
     }
     await _mirrorQueue(session);
     await _mirrorTrack(session);
