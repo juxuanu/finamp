@@ -1,4 +1,5 @@
 import 'package:finamp/models/finamp_models.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:finamp/services/theme_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,4 +46,4 @@ final currentAlbumImageProvider = Provider<FinampImage>((ref) {
   return FinampImage.empty();
 });
 
-final currentTrackProvider = StreamProvider((_) => GetIt.instance<QueueService>().getCurrentTrackStream());
+final currentTrackProvider = StreamProvider((_) => GetIt.instance<PlaybackController>().currentTrack);

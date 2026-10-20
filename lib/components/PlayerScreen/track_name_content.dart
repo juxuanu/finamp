@@ -6,7 +6,7 @@ import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/jellyfin_models.dart' as jellyfin_models;
 import 'package:finamp/screens/player_screen.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
-import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/scrolling_text_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -19,7 +19,7 @@ class TrackNameContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queue = ref.watch(QueueService.queueProvider);
+    final queue = ref.watch(PlaybackController.queueProvider);
 
     if (queue?.currentTrack == null) {
       return const CircularProgressIndicator();

@@ -9,6 +9,7 @@ import 'package:finamp/screens/music_screen.dart';
 import 'package:finamp/screens/settings_screen.dart';
 import 'package:finamp/services/favorite_provider.dart';
 import 'package:finamp/services/jellyfin_api.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -234,6 +235,8 @@ class PlayOnService {
     }
 
     _channel.sink.add('{"MessageType":"KeepAlive"}');
+    // Resume the session feed if we were remote-controlling a session before (re)connecting
+    _controller?.onSocketConnected();
 
     _channel.stream.listen(
       _handleMessage,
@@ -256,6 +259,21 @@ class PlayOnService {
       _playOnServiceLogger.fine("Sent KeepAlive message through websocket");
       _channel.sink.add('{"MessageType":"KeepAlive"}');
     });
+  }
+
+  bool get isConnected => socketState == SocketState.connected;
+
+  /// The playback controller, once it has been registered during startup.
+  PlaybackController? get _controller =>
+      GetIt.instance.isRegistered<PlaybackController>() ? GetIt.instance<PlaybackController>() : null;
+
+  /// Sends a raw message to the server over the websocket, if connected.
+  void sendMessage(String message) {
+    if (!isConnected) {
+      _playOnServiceLogger.warning("Can't send message, websocket is not connected: $message");
+      return;
+    }
+    _channel.sink.add(message);
   }
 
   void closeListener() {
@@ -317,6 +335,10 @@ class PlayOnService {
                 unawaited(GlobalSnackbar.navigatorState?.maybePop());
                 break;
             }
+            break;
+          case "Sessions":
+            // Session feed requested with "SessionsStart" while remote-controlling another session
+            await _controller?.onSessionsUpdate(request['Data'] as List<dynamic>);
             break;
           case "UserDataChanged":
             var item = await _jellyfinApiHelper.getItemById(

@@ -2314,6 +2314,39 @@
     "@outputMenuOpenConnectionSettingsButtonTitle": {
         "description": "Button title for connecting to a device from the output menu"
     },
+    "playOnMenuTitle": "Play On",
+    "@playOnMenuTitle": {
+        "description": "Title for the menu listing other Jellyfin sessions that can be remote-controlled, and label of the app bar button opening it"
+    },
+    "playOnNoSessionsFound": "No other sessions found",
+    "@playOnNoSessionsFound": {
+        "description": "Shown in the output menu when there are no other Jellyfin sessions that can be remote-controlled"
+    },
+    "playOnSessionSubtitle": "{client} · {nowPlaying}",
+    "@playOnSessionSubtitle": {
+        "description": "Subtitle for a remote Jellyfin session in the output menu, showing the client name and the currently playing track",
+        "placeholders": {
+            "client": {
+                "type": "String"
+            },
+            "nowPlaying": {
+                "type": "String"
+            }
+        }
+    },
+    "playOnWebsocketRequired": "Not connected to the server's websocket. Make sure 'Play On' support is enabled in the playback reporting settings.",
+    "@playOnWebsocketRequired": {
+        "description": "Shown in the Play On menu when another session can't be controlled because the websocket connection to the server is not established"
+    },
+    "playOnPlayingOn": "Playing on {deviceName}",
+    "@playOnPlayingOn": {
+        "description": "Label of the player screen button replacing the output button while another Jellyfin session is being remote-controlled",
+        "placeholders": {
+            "deviceName": {
+                "type": "String"
+            }
+        }
+    },
     "deviceType": "{type, select, speaker{Device Speaker} tv{TV} bluetooth{Bluetooth} other{Unknown}}",
     "@deviceType": {
         "placeholders": {

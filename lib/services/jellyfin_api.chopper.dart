@@ -518,6 +518,92 @@ final class _$JellyfinApi extends JellyfinApi {
   }
 
   @override
+  Future<dynamic> getSessions({required String controllableByUserId}) async {
+    final Uri $url = Uri.parse('/Sessions');
+    final Map<String, dynamic> $params = <String, dynamic>{
+      'controllableByUserId': controllableByUserId,
+    };
+    final Request $request = Request(
+      'GET',
+      $url,
+      client.baseUrl,
+      parameters: $params,
+    );
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+      responseConverter: JsonConverter.responseFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
+  Future<dynamic> playOnSession({
+    required String sessionId,
+    required String playCommand,
+    required String itemIds,
+    int? startPositionTicks,
+    int? startIndex,
+  }) async {
+    final Uri $url = Uri.parse('/Sessions/${sessionId}/Playing');
+    final Map<String, dynamic> $params = <String, dynamic>{
+      'playCommand': playCommand,
+      'itemIds': itemIds,
+      'startPositionTicks': startPositionTicks,
+      'startIndex': startIndex,
+    };
+    final Request $request = Request(
+      'POST',
+      $url,
+      client.baseUrl,
+      parameters: $params,
+    );
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
+  Future<dynamic> sendGeneralCommand({
+    required String sessionId,
+    required Map<String, dynamic> command,
+  }) async {
+    final Uri $url = Uri.parse('/Sessions/${sessionId}/Command');
+    final $body = command;
+    final Request $request = Request('POST', $url, client.baseUrl, body: $body);
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
+  Future<dynamic> sendPlaystateCommand({
+    required String sessionId,
+    required String command,
+    int? seekPositionTicks,
+  }) async {
+    final Uri $url = Uri.parse('/Sessions/${sessionId}/Playing/${command}');
+    final Map<String, dynamic> $params = <String, dynamic>{
+      'seekPositionTicks': seekPositionTicks,
+    };
+    final Request $request = Request(
+      'POST',
+      $url,
+      client.baseUrl,
+      parameters: $params,
+    );
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
   Future<dynamic> startPlayback(
     PlaybackProgressInfo playbackProgressInfo,
   ) async {

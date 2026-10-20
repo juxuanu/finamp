@@ -5,9 +5,13 @@ import 'package:finamp/menus/components/radio_mode_menu.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
+import 'dart:async';
+
 import 'package:finamp/services/music_player_background_task.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:finamp/services/radio_service_helper.dart';
+import 'package:finamp/services/playback/playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/utils/locale_helper.dart';
 import 'package:finamp/utils/platform_helper.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +27,12 @@ class PlayerButtonsLoopMode extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
+
+    // A remote-controlled session may not support changing the repeat mode
+    if (!ref.watch(PlaybackController.backendProvider).supports(PlaybackCapability.setRepeatMode)) {
+      return const SizedBox.shrink();
+    }
 
     final radioMode = ref.watch(finampSettingsProvider.radioMode);
     final radioEnabled = ref.watch(finampSettingsProvider.radioEnabled);
@@ -63,8 +72,8 @@ class PlayerButtonsLoopMode extends ConsumerWidget {
     }
 
     return StreamBuilder(
-      stream: queueService.getLoopModeStream(),
-      initialData: queueService.loopMode,
+      stream: playback.loopMode,
+      initialData: playback.loopMode.value,
       builder: (BuildContext context, snapshot) {
         final shortcutHint = GlobalShortcuts.getDisplay(ToggleLoopModeIntent);
         final loopModeHint = getLocalizedLoopMode(context, snapshot.data!);
@@ -82,7 +91,7 @@ class PlayerButtonsLoopMode extends ConsumerWidget {
               );
             } else {
               FeedbackHelper.feedback(FeedbackType.light);
-              queueService.toggleLoopMode();
+              unawaited(playback.toggleLoopMode());
             }
           },
           onLongPress: () => showRadioMenu(

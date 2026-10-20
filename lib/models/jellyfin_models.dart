@@ -510,6 +510,7 @@ class SessionInfo {
     required this.supportsMediaControl,
     this.nowPlayingQueue,
     required this.hasCustomDeviceName,
+    this.nowPlayingQueueFullItems,
   });
 
   @HiveField(0)
@@ -621,6 +622,10 @@ class SessionInfo {
   @HiveField(27)
   bool hasCustomDeviceName;
 
+  /// The full items of the now playing queue (Jellyfin 10.9+).
+  @HiveField(28)
+  List<BaseItemDto>? nowPlayingQueueFullItems;
+
   factory SessionInfo.fromJson(Map<String, dynamic> json) => _$SessionInfoFromJson(json);
   Map<String, dynamic> toJson() => _$SessionInfoToJson(this);
 }
@@ -695,6 +700,7 @@ class PlayerStateInfo {
     this.mediaSourceId,
     this.playMethod,
     this.repeatMode,
+    this.playbackOrder,
   });
 
   /// Gets or sets the now playing position ticks.
@@ -737,6 +743,10 @@ class PlayerStateInfo {
   /// Enum: "RepeatNone" "RepeatAll" "RepeatOne" Gets or sets the repeat mode.
   @HiveField(9)
   String? repeatMode;
+
+  /// Enum: "Default" "Shuffle" Gets or sets the playback order.
+  @HiveField(10)
+  String? playbackOrder;
 
   factory PlayerStateInfo.fromJson(Map<String, dynamic> json) => _$PlayerStateInfoFromJson(json);
   Map<String, dynamic> toJson() => _$PlayerStateInfoToJson(this);

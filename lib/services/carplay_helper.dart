@@ -24,6 +24,7 @@ import 'favorite_provider.dart';
 import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
 import 'audio_service_helper.dart';
+import 'playback/playback_controller.dart';
 import 'queue_service.dart';
 import 'item_helper.dart';
 import 'radio_service_helper.dart' as radio;
@@ -111,6 +112,7 @@ class CarPlayHelper {
   bool get isUserLoggedIn => _finampUserHelper.currentUser != null;
 
   final _queueService = GetIt.instance<QueueService>();
+  final _playback = GetIt.instance<PlaybackController>();
   final _images = CarPlayImageHelper();
 
   /// Runtime caps from `CPListTemplate.getMaximum*Count()`, reset on every
@@ -147,7 +149,7 @@ class CarPlayHelper {
     // Subscribed to the queue's own current-track stream rather than
     // audioHandler.mediaItem, since that emits on metadata-only updates
     // (e.g. artwork loading) and never emits once the queue empties.
-    _currentTrackSubscription = _queueService.getCurrentTrackStream().listen((track) {
+    _currentTrackSubscription = _playback.currentTrack.listen((track) {
       final trackId = track?.baseItem.id;
       if (trackId == _nowPlayingButtonsTrackId) return;
       _nowPlayingButtonsTrackId = trackId;
@@ -170,7 +172,7 @@ class CarPlayHelper {
 
     // Keep the shuffle button's glyph in sync with the queue's playback
     // order.
-    _playbackOrderSubscription = _queueService.getPlaybackOrderStream().listen((order) {
+    _playbackOrderSubscription = _playback.playbackOrder.listen((order) {
       _updateNowPlayingButtons();
     });
 
@@ -285,7 +287,7 @@ class CarPlayHelper {
         await _images.iconFontImageUri(isShuffled ? TablerIcons.arrows_shuffle : TablerIcons.arrows_right, 20) ??
         'sfsymbol:shuffle';
     final buttons = <CPNowPlayingButton>[
-      CPNowPlayingImageButton(image: shuffleIcon, onPress: () => _queueService.togglePlaybackOrder()),
+      CPNowPlayingImageButton(image: shuffleIcon, onPress: () => _playback.togglePlaybackOrder()),
     ];
 
     if (currentTrack != null && !isOffline) {
@@ -968,7 +970,7 @@ class CarPlayHelper {
       slice = slice.shuffle();
     }
 
-    await _queueService.startSlicePlayback(slice);
+    await _playback.startSlicePlayback(slice);
     await FlutterCarplay.showSharedNowPlaying();
   }
 
@@ -1233,7 +1235,7 @@ class CarPlayHelper {
                 final audioServiceHelper = GetIt.instance<AudioServiceHelper>();
                 await audioServiceHelper.startInstantMixForItem(baseItem);
               } else {
-                await _queueService.startPlayback(
+                await _playback.startPlayback(
                   items: [baseItem],
                   source: QueueItemSource(
                     type: QueueItemSourceType.allTracks,

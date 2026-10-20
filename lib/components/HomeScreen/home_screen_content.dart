@@ -19,7 +19,7 @@ import 'package:finamp/screens/home_screen_settings_screen.dart';
 import 'package:finamp/screens/music_screen.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/music_screen_provider.dart';
-import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/quick_actions_service.dart';
 import 'package:finamp/utils/platform_helper.dart';
 import 'package:flutter/material.dart';
@@ -216,9 +216,9 @@ class HomeScreenSection extends ConsumerWidget {
           if (sectionDisplayable is FinampPlayable) ...[
             IconButtonWithSemantics(
               onPressed: () async {
-                final queueService = GetIt.instance<QueueService>();
+                final playback = GetIt.instance<PlaybackController>();
                 final playable = sectionDisplayable as FinampPlayable;
-                await queueService.startSlicePlayback(
+                await playback.startSlicePlayback(
                   await ref.read(getPlayableSliceProvider(item: playable, startingOffset: 0).future),
                 );
               },
@@ -227,10 +227,10 @@ class HomeScreenSection extends ConsumerWidget {
             ),
             IconButtonWithSemantics(
               onPressed: () async {
-                final queueService = GetIt.instance<QueueService>();
+                final playback = GetIt.instance<PlaybackController>();
                 final playable = sectionDisplayable as FinampPlayable;
                 // TODO better shuffling?  need to think about shuffle all versus shuffle first
-                await queueService.startSlicePlayback(
+                await playback.startSlicePlayback(
                   (await ref.read(getPlayableSliceProvider(item: playable, startingOffset: 0).future)).shuffle(),
                 );
               },

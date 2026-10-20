@@ -14,12 +14,13 @@ import 'downloads_service.dart';
 import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
 import 'jellyfin_api_helper.dart';
+import 'playback/playback_controller.dart';
 import 'queue_service.dart';
 
 /// Just some functions to make talking to AudioService a bit neater.
 class AudioServiceHelper {
   final _jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
-  final _queueService = GetIt.instance<QueueService>();
+  final _playback = GetIt.instance<PlaybackController>();
   final _isarDownloader = GetIt.instance<DownloadsService>();
   final _finampUserHelper = GetIt.instance<FinampUserHelper>();
   final audioServiceHelperLogger = Logger("AudioServiceHelper");
@@ -53,7 +54,7 @@ class AudioServiceHelper {
               library: _finampUserHelper.currentUser!.currentView!.id,
             );
 
-      await _queueService.startPlayback(items: items, source: source, order: FinampPlaybackOrder.shuffled);
+      await _playback.startPlayback(items: items, source: source, order: FinampPlaybackOrder.shuffled);
     }
   }
 
@@ -106,7 +107,7 @@ class AudioServiceHelper {
     try {
       items = await _jellyfinApiHelper.getInstantMix(item);
       if (items != null) {
-        await _queueService.startPlayback(
+        await _playback.startPlayback(
           items: items,
           source: QueueItemSource(
             type: switch (BaseItemDtoType.fromItem(item)) {
@@ -141,7 +142,7 @@ class AudioServiceHelper {
     try {
       items = await _jellyfinApiHelper.getArtistMix(artists.map((e) => e.id).toList());
       if (items != null) {
-        await _queueService.startPlayback(
+        await _playback.startPlayback(
           items: items,
           source: QueueItemSource(
             type: QueueItemSourceType.artistMix,
@@ -170,7 +171,7 @@ class AudioServiceHelper {
     try {
       items = await _jellyfinApiHelper.getAlbumMix(albums.map((e) => e.id).toList());
       if (items != null) {
-        await _queueService.startPlayback(
+        await _playback.startPlayback(
           items: items,
           source: QueueItemSource(
             type: QueueItemSourceType.albumMix,
@@ -199,7 +200,7 @@ class AudioServiceHelper {
     try {
       items = await _jellyfinApiHelper.getGenreMix(genres.map((e) => e.id).toList());
       if (items != null) {
-        await _queueService.startPlayback(
+        await _playback.startPlayback(
           items: items,
           source: QueueItemSource(
             type: QueueItemSourceType.genreMix,
@@ -344,7 +345,7 @@ class AudioServiceHelper {
       itemsToPlay = [randomItem];
     }
 
-    await _queueService.startPlayback(items: itemsToPlay, source: QueueItemSource.fromBaseItem(randomItem));
+    await _playback.startPlayback(items: itemsToPlay, source: QueueItemSource.fromBaseItem(randomItem));
   }
 
   Future<Map<ContentType, num>> _generateRandomContentTypeWeights(

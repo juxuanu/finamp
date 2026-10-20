@@ -34,7 +34,7 @@ import '../../services/audio_service_helper.dart';
 import '../../services/downloads_service.dart';
 import '../../services/finamp_settings_helper.dart';
 import '../../services/music_providers.dart';
-import '../../services/queue_service.dart';
+import '../../services/playback/playback_controller.dart';
 import '../../services/theme_provider.dart';
 import '../album_image.dart';
 import '../print_duration.dart';
@@ -125,7 +125,7 @@ class TrackListTile extends ConsumerWidget {
 
       final baseItemType = BaseItemDtoType.fromItem(parentItem!);
       final SortBy sortBy = selectedFilter!.getSortBy();
-      final queueService = GetIt.instance<QueueService>();
+      final playback = GetIt.instance<PlaybackController>();
       final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
       List<BaseItemDto> allTracks;
 
@@ -182,7 +182,7 @@ class TrackListTile extends ConsumerWidget {
       remainingTracks = sortItems(remainingTracks, sortBy, SortOrder.descending);
 
       // Append to queue
-      await queueService.addToQueue(
+      await playback.addToQueue(
         PlayableSlice.simple(
           remainingTracks,
           QueueItemSource.rawId(
@@ -200,7 +200,7 @@ class TrackListTile extends ConsumerWidget {
     }
 
     Future<void> trackListTileOnTap(bool playable) async {
-      final queueService = GetIt.instance<QueueService>();
+      final playback = GetIt.instance<PlaybackController>();
 
       if (!playable) return;
 
@@ -244,7 +244,7 @@ class TrackListTile extends ConsumerWidget {
       invalidateRadioCache();
 
       // start linear playback of album from the given index
-      await queueService.startSlicePlayback(slice);
+      await playback.startSlicePlayback(slice);
 
       if (lazyAddMoreTracksToQueue) {
         unawaited(
@@ -312,7 +312,7 @@ IconData getSwipeActionIcon(ItemSwipeActions action) {
 }
 
 Future<bool> onConfirmPlayableDismiss({required ItemSwipeActions followUpAction, required FinampPlayable item}) async {
-  final queueService = GetIt.instance<QueueService>();
+  final playback = GetIt.instance<PlaybackController>();
 
   final sourceItemType = switch (item) {
     AlbumDisc() => "disc",
@@ -326,21 +326,21 @@ Future<bool> onConfirmPlayableDismiss({required ItemSwipeActions followUpAction,
 
   switch (followUpAction) {
     case ItemSwipeActions.addToNextUp:
-      unawaited(queueService.addToNextUp(slice));
+      unawaited(playback.addToNextUp(slice));
       GlobalSnackbar.message(
         (scaffold) => AppLocalizations.of(scaffold)!.confirmAddToNextUp(sourceItemType),
         isConfirmation: true,
       );
       break;
     case ItemSwipeActions.playNext:
-      unawaited(queueService.addNext(slice));
+      unawaited(playback.addNext(slice));
       GlobalSnackbar.message(
         (scaffold) => AppLocalizations.of(scaffold)!.confirmPlayNext(sourceItemType),
         isConfirmation: true,
       );
       break;
     case ItemSwipeActions.addToQueue:
-      unawaited(queueService.addToQueue(slice));
+      unawaited(playback.addToQueue(slice));
       GlobalSnackbar.message(
         (scaffold) => AppLocalizations.of(scaffold)!.confirmAddToQueue(sourceItemType),
         isConfirmation: true,
@@ -435,7 +435,7 @@ class QueueListTile extends StatelessWidget {
         TrackListItemFeatures.duration,
         TrackListItemFeatures.addToPlaylistOrFavorite,
         TrackListItemFeatures.swipeableInTrackList,
-        TrackListItemFeatures.swipeableInQueue,
+        onRemoveFromList != null ? TrackListItemFeatures.swipeableInQueue : null,
         allowReorder ? TrackListItemFeatures.dragHandle : null,
       ].nonNulls.toList(),
     );

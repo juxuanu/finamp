@@ -35,6 +35,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
+import 'package:finamp/services/playback/playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -118,6 +120,7 @@ class TrackMenu extends ConsumerStatefulWidget {
 class _TrackMenuState extends ConsumerState<TrackMenu> with TickerProviderStateMixin {
   final _audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
   final _queueService = GetIt.instance<QueueService>();
+  final _playback = GetIt.instance<PlaybackController>();
 
   // Makes sure that widget doesn't just disappear after press while menu is visible
   bool speedWidgetWasVisible = false;
@@ -277,13 +280,17 @@ class _TrackMenuState extends ConsumerState<TrackMenu> with TickerProviderStateM
     final radioEnabled = ref.watch(finampSettingsProvider.radioEnabled);
     final currentRadioAvailabilityStatus = ref.watch(currentRadioAvailabilityStatusProvider);
     final radioFailed = ref.watch(radioStateProvider.select((state) => state?.failed ?? false));
+    // A remote-controlled session may not support changing the playback order or repeat mode
+    final backend = ref.watch(PlaybackController.backendProvider);
+    final supportsShuffle = backend.supports(PlaybackCapability.setShuffle);
+    final supportsRepeat = backend.supports(PlaybackCapability.setRepeatMode);
 
     return [
       if (widget.showPlaybackControls) ...[
         StreamBuilder<PlaybackBehaviorInfo>(
           stream: Rx.combineLatest3(
-            _queueService.getPlaybackOrderStream(),
-            _queueService.getLoopModeStream(),
+            _playback.playbackOrder,
+            _playback.loopMode,
             _queueService.getPlaybackSpeedStream(),
             (a, b, c) => PlaybackBehaviorInfo(a, b, c),
           ),
@@ -313,16 +320,17 @@ class _TrackMenuState extends ConsumerState<TrackMenu> with TickerProviderStateM
             };
 
             var playbackActionsArray = [
-              PlaybackAction(
-                icon: playbackOrderIcons[playbackBehavior.order]!,
-                onPressed: () async {
-                  await _queueService.togglePlaybackOrder();
-                },
-                label: playbackOrderTooltips[playbackBehavior.order]!,
-                iconColor: playbackBehavior.order == FinampPlaybackOrder.shuffled
-                    ? iconColor
-                    : Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
-              ),
+              if (supportsShuffle)
+                PlaybackAction(
+                  icon: playbackOrderIcons[playbackBehavior.order]!,
+                  onPressed: () async {
+                    await _playback.togglePlaybackOrder();
+                  },
+                  label: playbackOrderTooltips[playbackBehavior.order]!,
+                  iconColor: playbackBehavior.order == FinampPlaybackOrder.shuffled
+                      ? iconColor
+                      : Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
+                ),
               ValueListenableBuilder<SleepTimer?>(
                 valueListenable: _audioHandler.timer,
                 builder: (context, timerValue, child) {
@@ -364,37 +372,38 @@ class _TrackMenuState extends ConsumerState<TrackMenu> with TickerProviderStateM
                   );
                 },
               ),
-              PlaybackAction(
-                icon: radioEnabled
-                    ? (currentRadioAvailabilityStatus.isAvailable && !radioFailed)
-                          ? TablerIcons.radio
-                          : TablerIcons.radio_off
-                    : loopModeIcons[playbackBehavior.loop]!,
-                onPressed: () async {
-                  if (radioEnabled) {
-                    await showRadioMenu(
-                      context,
-                      subtitle: radioFailed ? AppLocalizations.of(context)!.radioFailedSubtitle : null,
-                    );
-                    return;
-                  }
-                  _queueService.toggleLoopMode();
-                },
-                onLongPress: () => showRadioMenu(
-                  context,
-                  subtitle: radioFailed
-                      ? AppLocalizations.of(context)!.radioFailedSubtitle
-                      : AppLocalizations.of(context)!.loopingOverriddenByRadioSubtitle,
+              if (supportsRepeat)
+                PlaybackAction(
+                  icon: radioEnabled
+                      ? (currentRadioAvailabilityStatus.isAvailable && !radioFailed)
+                            ? TablerIcons.radio
+                            : TablerIcons.radio_off
+                      : loopModeIcons[playbackBehavior.loop]!,
+                  onPressed: () async {
+                    if (radioEnabled) {
+                      await showRadioMenu(
+                        context,
+                        subtitle: radioFailed ? AppLocalizations.of(context)!.radioFailedSubtitle : null,
+                      );
+                      return;
+                    }
+                    unawaited(_playback.toggleLoopMode());
+                  },
+                  onLongPress: () => showRadioMenu(
+                    context,
+                    subtitle: radioFailed
+                        ? AppLocalizations.of(context)!.radioFailedSubtitle
+                        : AppLocalizations.of(context)!.loopingOverriddenByRadioSubtitle,
+                  ),
+                  label: radioEnabled
+                      ? (currentRadioAvailabilityStatus.isAvailable
+                            ? AppLocalizations.of(context)!.radioModeOptionTitle(radioMode.name)
+                            : AppLocalizations.of(context)!.radioModeInactiveTitle)
+                      : loopModeTooltips[playbackBehavior.loop]!,
+                  iconColor: currentRadioAvailabilityStatus.isAvailable || playbackBehavior.loop != FinampLoopMode.none
+                      ? iconColor
+                      : Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
                 ),
-                label: radioEnabled
-                    ? (currentRadioAvailabilityStatus.isAvailable
-                          ? AppLocalizations.of(context)!.radioModeOptionTitle(radioMode.name)
-                          : AppLocalizations.of(context)!.radioModeInactiveTitle)
-                    : loopModeTooltips[playbackBehavior.loop]!,
-                iconColor: currentRadioAvailabilityStatus.isAvailable || playbackBehavior.loop != FinampLoopMode.none
-                    ? iconColor
-                    : Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
-              ),
             ];
 
             final speedWidget = PlaybackAction(

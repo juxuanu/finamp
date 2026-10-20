@@ -5,6 +5,7 @@ import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/services/music_player_background_task.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
@@ -56,40 +57,40 @@ class FullscreenIntent extends Intent {
 
 Map<Type, Action<Intent>> getMusicControlActions() {
   final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
-  final queueService = GetIt.instance<QueueService>();
+  final playback = GetIt.instance<PlaybackController>();
 
   return {
     TogglePlaybackIntent: _MusicControlTextFieldSafeAction<TogglePlaybackIntent>(
       onInvoke: (_) {
-        unawaited(audioHandler.togglePlayback());
+        unawaited(playback.togglePlayback());
         return null;
       },
     ),
     SkipToNextIntent: _MusicControlAction<SkipToNextIntent>(
       onInvoke: (_) {
-        audioHandler.skipToNext();
+        playback.skipToNext();
         GlobalSnackbar.message((context) => AppLocalizations.of(context)!.skipToNextTrackButtonTooltip);
         return null;
       },
     ),
     SkipToPreviousIntent: _MusicControlAction<SkipToPreviousIntent>(
       onInvoke: (_) {
-        audioHandler.skipToPrevious();
+        playback.skipToPrevious();
         GlobalSnackbar.message((context) => AppLocalizations.of(context)!.skipToPreviousTrackButtonTooltip);
         return null;
       },
     ),
     SeekForwardIntent: _MusicControlTextFieldSafeAction<SeekForwardIntent>(
       onInvoke: (_) {
-        audioHandler.seek(audioHandler.playbackPosition + const Duration(seconds: 30));
+        playback.seek(playback.playbackState.value.position + const Duration(seconds: 30));
         return null;
       },
     ),
     SeekBackwardIntent: _MusicControlTextFieldSafeAction<SeekBackwardIntent>(
       onInvoke: (_) {
-        final current = audioHandler.playbackPosition;
+        final current = playback.playbackState.value.position;
         final target = current < const Duration(seconds: 5) ? Duration.zero : current - const Duration(seconds: 5);
-        audioHandler.seek(target);
+        playback.seek(target);
         return null;
       },
     ),
@@ -109,10 +110,10 @@ Map<Type, Action<Intent>> getMusicControlActions() {
     ),
     ToggleLoopModeIntent: _MusicControlTextFieldSafeAction<ToggleLoopModeIntent>(
       onInvoke: (_) {
-        queueService.toggleLoopMode();
+        playback.toggleLoopMode();
 
         GlobalSnackbar.message((context) {
-          switch (queueService.loopMode) {
+          switch (playback.loopMode.value) {
             case FinampLoopMode.all:
               return AppLocalizations.of(context)!.loopModeAllButtonLabel;
             case FinampLoopMode.one:
@@ -127,10 +128,10 @@ Map<Type, Action<Intent>> getMusicControlActions() {
     ),
     TogglePlaybackOrderIntent: _MusicControlTextFieldSafeAction<TogglePlaybackOrderIntent>(
       onInvoke: (_) {
-        queueService.togglePlaybackOrder();
+        playback.togglePlaybackOrder();
 
         GlobalSnackbar.message((context) {
-          switch (queueService.playbackOrder) {
+          switch (playback.playbackOrder.value) {
             case FinampPlaybackOrder.linear:
               return AppLocalizations.of(context)!.playbackOrderLinearButtonLabel;
             case FinampPlaybackOrder.shuffled:

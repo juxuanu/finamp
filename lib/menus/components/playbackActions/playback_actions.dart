@@ -6,6 +6,7 @@ import 'package:finamp/menus/components/playbackActions/playback_action.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/music_models.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -169,7 +170,7 @@ class PlayPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
     return PlaybackAction(
       icon: TablerIcons.player_play,
       label: AppLocalizations.of(context)!.playButtonLabel,
@@ -179,7 +180,7 @@ class PlayPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.startSlicePlayback(
+        await playback.startSlicePlayback(
           await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future),
         );
       },
@@ -197,7 +198,7 @@ class PlayNextPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.corner_right_down,
@@ -208,7 +209,7 @@ class PlayNextPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.addNext(await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future));
+        await playback.addNext(await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future));
 
         GlobalSnackbar.message(
           (scaffold) =>
@@ -230,7 +231,7 @@ class MovePlayNextPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.corner_right_down,
@@ -241,8 +242,8 @@ class MovePlayNextPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        unawaited(queueService.removeQueueItem(item));
-        await queueService.addNext(PlayableSlice.simple([item.baseItem], item.source));
+        unawaited(GetIt.instance<QueueService>().removeQueueItem(item));
+        await playback.addNext(PlayableSlice.simple([item.baseItem], item.source));
 
         GlobalSnackbar.message(
           (scaffold) => AppLocalizations.of(scaffold)!.confirmPlayNext(BaseItemDtoType.fromItem(item.baseItem).name),
@@ -263,7 +264,7 @@ class AddToNextUpPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.corner_right_down_double,
@@ -274,7 +275,7 @@ class AddToNextUpPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.addToNextUp(await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future));
+        await playback.addToNextUp(await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future));
 
         GlobalSnackbar.message(
           (scaffold) =>
@@ -301,7 +302,7 @@ class MoveAddToNextUpPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.corner_right_down_double,
@@ -312,8 +313,8 @@ class MoveAddToNextUpPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        unawaited(queueService.removeQueueItem(item));
-        await queueService.addToNextUp(PlayableSlice.simple([item.baseItem], item.source));
+        unawaited(GetIt.instance<QueueService>().removeQueueItem(item));
+        await playback.addToNextUp(PlayableSlice.simple([item.baseItem], item.source));
 
         GlobalSnackbar.message(
           (scaffold) => AppLocalizations.of(scaffold)!.confirmAddToNextUp(BaseItemDtoType.fromItem(item.baseItem).name),
@@ -334,7 +335,7 @@ class AddToQueuePlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.playlist,
@@ -345,7 +346,7 @@ class AddToQueuePlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.addToQueue(await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future));
+        await playback.addToQueue(await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future));
 
         GlobalSnackbar.message(
           (scaffold) =>
@@ -372,7 +373,7 @@ class MoveAddToQueuePlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.playlist,
@@ -383,8 +384,8 @@ class MoveAddToQueuePlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        unawaited(queueService.removeQueueItem(item));
-        await queueService.addToQueue(PlayableSlice.simple([item.baseItem], item.source));
+        unawaited(GetIt.instance<QueueService>().removeQueueItem(item));
+        await playback.addToQueue(PlayableSlice.simple([item.baseItem], item.source));
 
         GlobalSnackbar.message(
           (scaffold) => AppLocalizations.of(scaffold)!.confirmAddToQueue(BaseItemDtoType.fromItem(item.baseItem).name),
@@ -414,7 +415,7 @@ class ShufflePlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.arrows_shuffle,
@@ -429,7 +430,7 @@ class ShufflePlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.startSlicePlayback(
+        await playback.startSlicePlayback(
           (await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future)).shuffle(),
         );
       },
@@ -456,7 +457,7 @@ class ShuffleNextPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.corner_right_down,
@@ -472,7 +473,7 @@ class ShuffleNextPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.addNext(
+        await playback.addNext(
           (await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future)).shuffle(),
         );
 
@@ -501,7 +502,7 @@ class ShuffleToNextUpPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.corner_right_down_double,
@@ -517,7 +518,7 @@ class ShuffleToNextUpPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.addToNextUp(
+        await playback.addToNextUp(
           (await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future)).shuffle(),
         );
 
@@ -549,7 +550,7 @@ class ShuffleToQueuePlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
 
     return PlaybackAction(
       icon: TablerIcons.playlist,
@@ -565,7 +566,7 @@ class ShuffleToQueuePlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.addToQueue(
+        await playback.addToQueue(
           (await ref.watch(getPlayableSliceProvider(item: item, startingOffset: 0).future)).shuffle(),
         );
 
@@ -597,7 +598,7 @@ class ShuffleAlbumsPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
     assert(item is Genre || item is Artist || (item is FinampSortable<Album> && item is FinampPlayable));
 
     return PlaybackAction(
@@ -613,7 +614,7 @@ class ShuffleAlbumsPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.startSlicePlayback(await ref.watch(getAlbumShuffledPlayerSliceProvider(item: item).future));
+        await playback.startSlicePlayback(await ref.watch(getAlbumShuffledPlayerSliceProvider(item: item).future));
       },
       iconColor: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
     );
@@ -638,7 +639,7 @@ class ShuffleAlbumsNextPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
     assert(item is Genre || item is Artist || (item is FinampSortable<Album> && item is FinampPlayable));
 
     return PlaybackAction(
@@ -655,7 +656,7 @@ class ShuffleAlbumsNextPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.addNext(await ref.watch(getAlbumShuffledPlayerSliceProvider(item: item).future));
+        await playback.addNext(await ref.watch(getAlbumShuffledPlayerSliceProvider(item: item).future));
 
         GlobalSnackbar.message((scaffold) => AppLocalizations.of(scaffold)!.confirmShuffleNext, isConfirmation: true);
       },
@@ -682,7 +683,7 @@ class ShuffleAlbumsToNextUpPlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
     assert(item is Genre || item is Artist || (item is FinampSortable<Album> && item is FinampPlayable));
 
     return PlaybackAction(
@@ -699,7 +700,7 @@ class ShuffleAlbumsToNextUpPlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.addToNextUp(await ref.watch(getAlbumShuffledPlayerSliceProvider(item: item).future));
+        await playback.addToNextUp(await ref.watch(getAlbumShuffledPlayerSliceProvider(item: item).future));
 
         GlobalSnackbar.message(
           (scaffold) => AppLocalizations.of(scaffold)!.confirmShuffleToNextUp,
@@ -729,7 +730,7 @@ class ShuffleAlbumsToQueuePlaybackAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queueService = GetIt.instance<QueueService>();
+    final playback = GetIt.instance<PlaybackController>();
     assert(item is Genre || item is Artist || (item is FinampSortable<Album> && item is FinampPlayable));
 
     return PlaybackAction(
@@ -746,7 +747,7 @@ class ShuffleAlbumsToQueuePlaybackAction extends ConsumerWidget {
           Navigator.pop(context);
         }
 
-        await queueService.addToQueue(await ref.watch(getAlbumShuffledPlayerSliceProvider(item: item).future));
+        await playback.addToQueue(await ref.watch(getAlbumShuffledPlayerSliceProvider(item: item).future));
 
         GlobalSnackbar.message(
           (scaffold) => AppLocalizations.of(scaffold)!.confirmShuffleToQueue,

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
 
-import '../../services/music_player_background_task.dart';
+import '../../services/playback/playback_controller.dart';
 
 typedef DragCallback = void Function(double? value);
 
@@ -195,7 +195,7 @@ class __PlaybackProgressSliderState extends ConsumerState<_PlaybackProgressSlide
   /// Value used to hold the slider's value when dragging.
   double? _dragValue;
 
-  final _audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
+  final _playback = GetIt.instance<PlaybackController>();
 
   @override
   Widget build(BuildContext context) {
@@ -272,7 +272,7 @@ class __PlaybackProgressSliderState extends ConsumerState<_PlaybackProgressSlide
         onChangeEnd: widget.allowSeeking
             ? (newValue) async {
                 // Seek to the new position
-                await _audioHandler.seek(Duration(microseconds: newValue.toInt()));
+                await _playback.seek(Duration(microseconds: newValue.toInt()));
 
                 // Clear drag value so that the slider uses the play
                 // duration again.

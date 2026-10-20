@@ -56,6 +56,9 @@ import 'package:finamp/services/offline_listen_helper.dart';
 import 'package:finamp/services/playback_history_service.dart';
 import 'package:finamp/services/playon_service.dart';
 import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/playback/local_playback_backend.dart';
+import 'package:finamp/services/playback/playback_controller.dart';
+import 'package:finamp/services/playback/playback_session_handler.dart';
 import 'package:finamp/services/theme_provider.dart';
 import 'package:finamp/services/ui_overlay_setter_observer.dart';
 import 'package:finamp/services/widget_bindings_observer_provider.dart';
@@ -436,8 +439,21 @@ Future<void> _setupPlaybackServices() async {
 
   GetIt.instance.registerSingleton<AndroidAutoHelper>(AndroidAutoHelper());
 
-  final audioHandler = await AudioService.init(
-    builder: () => MusicPlayerBackgroundTask(),
+  final audioHandler = MusicPlayerBackgroundTask();
+  GetIt.instance.registerSingleton<MusicPlayerBackgroundTask>(audioHandler);
+  var queueService = QueueService();
+  GetIt.instance.registerSingleton(queueService);
+  final playbackController = PlaybackController(
+    local: LocalPlaybackBackend(audioHandler: audioHandler, queueService: queueService),
+    queueService: queueService,
+    jellyfinApiHelper: GetIt.instance<JellyfinApiHelper>(),
+    playOnService: GetIt.instance<PlayOnService>(),
+    providers: GetIt.instance<ProviderContainer>(),
+  );
+  GetIt.instance.registerSingleton(playbackController);
+
+  await AudioService.init(
+    builder: () => PlaybackSessionHandler(controller: playbackController, player: audioHandler),
     config: AudioServiceConfig(
       androidStopForegroundOnPause: FinampSettingsHelper.finampSettings.androidStopForegroundOnPause,
       androidNotificationChannelName: "Finamp",
@@ -466,9 +482,6 @@ Future<void> _setupPlaybackServices() async {
     cacheManager: StubImageCache(),
   );
 
-  GetIt.instance.registerSingleton<MusicPlayerBackgroundTask>(audioHandler);
-  var queueService = QueueService();
-  GetIt.instance.registerSingleton(queueService);
   audioHandler.onQueueServiceAvailable(); // breaking circular dependency
   GetIt.instance.registerSingleton(PlaybackHistoryService());
   GetIt.instance.registerSingleton(AudioServiceHelper());

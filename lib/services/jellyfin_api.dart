@@ -310,6 +310,39 @@ abstract class JellyfinApi extends ChopperService {
     @Body() ClientCapabilities clientCapabilities,
   );
 
+  /// Gets the sessions that can be remotely controlled by the given user.
+  @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory<dynamic, dynamic>)
+  @GET(path: "/Sessions")
+  Future<dynamic> getSessions({@Query() required String controllableByUserId});
+
+  /// Instructs a remote session to play the given items.
+  @FactoryConverter(request: JsonConverter.requestFactory)
+  @POST(path: "/Sessions/{sessionId}/Playing", optionalBody: true)
+  Future<dynamic> playOnSession({
+    @Path() required String sessionId,
+    @Query() required String playCommand,
+    @Query() required String itemIds,
+    @Query() int? startPositionTicks,
+    @Query() int? startIndex,
+  });
+
+  /// Sends a general command (e.g. "SetVolume", "SetRepeatMode") with its arguments to a remote session.
+  @FactoryConverter(request: JsonConverter.requestFactory)
+  @POST(path: "/Sessions/{sessionId}/Command")
+  Future<dynamic> sendGeneralCommand({
+    @Path() required String sessionId,
+    @Body() required Map<String, dynamic> command,
+  });
+
+  /// Sends a playstate command (e.g. "PlayPause", "NextTrack") to a remote session.
+  @FactoryConverter(request: JsonConverter.requestFactory)
+  @POST(path: "/Sessions/{sessionId}/Playing/{command}", optionalBody: true)
+  Future<dynamic> sendPlaystateCommand({
+    @Path() required String sessionId,
+    @Path() required String command,
+    @Query() int? seekPositionTicks,
+  });
+
   @FactoryConverter(request: JsonConverter.requestFactory)
   @POST(path: "/Sessions/Playing")
   Future<dynamic> startPlayback(@Body() PlaybackProgressInfo playbackProgressInfo);

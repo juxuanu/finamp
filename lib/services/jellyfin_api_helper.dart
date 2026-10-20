@@ -783,6 +783,57 @@ class JellyfinApiHelper {
     await jellyfinApi.updateCapabilitiesFull(capabilities);
   }
 
+  /// Gets the sessions the current user can remotely control, excluding this device.
+  Future<List<SessionInfo>> getControllableSessions() async {
+    assert(_verifyCallable());
+    final response = await jellyfinApi.getSessions(controllableByUserId: _finampUserHelper.currentUser!.id);
+    final deviceInfo = await jellyfin_api.getDeviceInfo(deviceId: FinampSettingsHelper.finampSettings.deviceId);
+    return (response as List<dynamic>)
+        .map((session) => SessionInfo.fromJson(session as Map<String, dynamic>))
+        .where((session) => session.deviceId != deviceInfo.id)
+        .toList();
+  }
+
+  /// Plays [itemIds] on a remote session. [playCommand] is one of "PlayNow", "PlayNext" or "PlayLast".
+  Future<void> playOnSession({
+    required String sessionId,
+    required List<BaseItemId> itemIds,
+    String playCommand = "PlayNow",
+    int startIndex = 0,
+  }) async {
+    assert(_verifyCallable());
+    await jellyfinApi.playOnSession(
+      sessionId: sessionId,
+      playCommand: playCommand,
+      itemIds: itemIds.join(","),
+      startIndex: startIndex,
+    );
+  }
+
+  /// Sends a general command (e.g. "SetVolume", "SetRepeatMode") with its [arguments] to a remote session.
+  Future<void> sendGeneralCommand({
+    required String sessionId,
+    required String name,
+    Map<String, String> arguments = const {},
+  }) async {
+    assert(_verifyCallable());
+    await jellyfinApi.sendGeneralCommand(sessionId: sessionId, command: {"Name": name, "Arguments": arguments});
+  }
+
+  /// Sends a playstate command (e.g. "PlayPause", "NextTrack", "Seek") to a remote session.
+  Future<void> sendPlaystateCommand({
+    required String sessionId,
+    required String command,
+    Duration? seekPosition,
+  }) async {
+    assert(_verifyCallable());
+    await jellyfinApi.sendPlaystateCommand(
+      sessionId: sessionId,
+      command: command,
+      seekPositionTicks: seekPosition == null ? null : seekPosition.inMicroseconds * 10,
+    );
+  }
+
   /// Tells the Jellyfin server that playback has started
   Future<void> reportPlaybackStart(PlaybackProgressInfo playbackProgressInfo) async {
     assert(_verifyCallable());
