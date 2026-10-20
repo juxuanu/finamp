@@ -7,6 +7,7 @@ import 'package:finamp/components/finamp_icon.dart';
 import 'package:finamp/extensions/color_extensions.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/menus/components/icon_button_with_semantics.dart';
+import 'package:finamp/menus/play_on_menu.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/music_models.dart';
 import 'package:finamp/screens/downloads_screen.dart';
@@ -270,6 +271,7 @@ class FinampMusicScreenHeader extends ConsumerWidget implements PreferredSizeWid
                         }
                       },
                     ),
+                  const PlayOnButton(),
                   if (singleTabConfig?.base case CollectionHomeSection collection)
                     IconButtonWithSemantics(
                       label: singleTabConfig!.getTitle(context.l10n),

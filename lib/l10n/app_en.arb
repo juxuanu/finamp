@@ -2314,9 +2314,9 @@
     "@outputMenuOpenConnectionSettingsButtonTitle": {
         "description": "Button title for connecting to a device from the output menu"
     },
-    "outputMenuPlayOnSectionTitle": "Play On",
-    "@outputMenuPlayOnSectionTitle": {
-        "description": "Title for the section in the output menu listing other Jellyfin sessions that can be remote-controlled"
+    "playOnMenuTitle": "Play On",
+    "@playOnMenuTitle": {
+        "description": "Title for the menu listing other Jellyfin sessions that can be remote-controlled, and label of the app bar button opening it"
     },
     "playOnNoSessionsFound": "No other sessions found",
     "@playOnNoSessionsFound": {
