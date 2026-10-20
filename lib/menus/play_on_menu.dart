@@ -52,6 +52,8 @@ class PlayOnButton extends ConsumerWidget {
 }
 
 Future<void> showPlayOnMenu({required BuildContext context}) async {
+  // Show up-to-date sessions whenever the menu is opened
+  GetIt.instance<ProviderContainer>().invalidate(controllableSessionsProvider);
   await showThemedBottomSheet<void>(
     context: context,
     routeName: playOnMenuRouteName,
@@ -83,20 +85,8 @@ Future<void> showPlayOnMenu({required BuildContext context}) async {
 
 /// Lists the other Jellyfin sessions of the current user. Tapping a session
 /// starts controlling it, tapping the controlled session again releases it.
-class PlayOnSessionList extends ConsumerStatefulWidget {
+class PlayOnSessionList extends ConsumerWidget {
   const PlayOnSessionList({super.key});
-
-  @override
-  ConsumerState<PlayOnSessionList> createState() => _PlayOnSessionListState();
-}
-
-class _PlayOnSessionListState extends ConsumerState<PlayOnSessionList> {
-  @override
-  void initState() {
-    super.initState();
-    // Show up-to-date sessions whenever the menu is opened
-    ref.invalidate(controllableSessionsProvider);
-  }
 
   Future<void> _toggleControl(SessionInfo session, bool isControlled) async {
     final remoteControl = GetIt.instance<RemoteControlService>();
@@ -116,7 +106,7 @@ class _PlayOnSessionListState extends ConsumerState<PlayOnSessionList> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(controllableSessionsProvider);
     final controlledSession = ref.watch(RemoteControlService.controlledSessionProvider);
     if (sessions.isLoading && !sessions.hasValue) {

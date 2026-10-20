@@ -260,6 +260,7 @@ class FinampMusicScreenHeader extends ConsumerWidget implements PreferredSizeWid
                         refreshTab();
                       },
                     ),
+                  const PlayOnButton(),
                   if (singleTabConfig == null || singleTabConfig?.base is TabsHomeSection)
                     IconButtonWithSemantics(
                       label: context.l10n.search,
@@ -271,7 +272,6 @@ class FinampMusicScreenHeader extends ConsumerWidget implements PreferredSizeWid
                         }
                       },
                     ),
-                  const PlayOnButton(),
                   if (singleTabConfig?.base case CollectionHomeSection collection)
                     IconButtonWithSemantics(
                       label: singleTabConfig!.getTitle(context.l10n),
