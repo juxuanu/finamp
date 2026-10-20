@@ -20,6 +20,20 @@ enum PlaybackCapability {
   final String? jellyfinCommand;
 }
 
+extension LoopModeCycle on FinampLoopMode {
+  /// The mode the loop button cycles to: all → one → none → all.
+  FinampLoopMode get next => switch (this) {
+    FinampLoopMode.all => FinampLoopMode.one,
+    FinampLoopMode.one => FinampLoopMode.none,
+    FinampLoopMode.none => FinampLoopMode.all,
+  };
+}
+
+extension PlaybackOrderToggle on FinampPlaybackOrder {
+  FinampPlaybackOrder get toggled =>
+      this == FinampPlaybackOrder.shuffled ? FinampPlaybackOrder.linear : FinampPlaybackOrder.shuffled;
+}
+
 /// Something that plays music and exposes its state: either this device's
 /// player or another Jellyfin session controlled remotely ("Play On").
 ///
@@ -61,6 +75,10 @@ abstract interface class PlaybackBackend {
   // Modes
   Future<void> setLoopMode(FinampLoopMode mode);
   Future<void> setPlaybackOrder(FinampPlaybackOrder order, {List<int>? shuffleOrder});
+
+  /// Cycles the loop mode (see [LoopModeCycle.next]).
+  Future<void> toggleLoopMode();
+  Future<void> togglePlaybackOrder();
 
   bool supports(PlaybackCapability capability);
 

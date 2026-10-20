@@ -222,6 +222,12 @@ class RemotePlaybackBackend implements PlaybackBackend {
     });
   }
 
+  @override
+  Future<void> toggleLoopMode() => setLoopMode(_loopMode.value.next);
+
+  @override
+  Future<void> togglePlaybackOrder() => setPlaybackOrder(_playbackOrder.value.toggled);
+
   // Mirroring
 
   /// Mirrors a session update pushed by the server.

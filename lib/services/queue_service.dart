@@ -1482,43 +1482,31 @@ class QueueService {
 
   FinampPlaybackOrder get playbackOrder => _playbackOrder;
 
-  Future<void> togglePlaybackOrder() {
-    final currentOrder = _controller.playbackOrder.valueOrNull ?? _playbackOrder;
-    if (currentOrder == FinampPlaybackOrder.shuffled) {
-      return setPlaybackOrder(FinampPlaybackOrder.linear);
-    } else {
-      return setPlaybackOrder(FinampPlaybackOrder.shuffled);
+  Future<void> togglePlaybackOrder() => _backend.togglePlaybackOrder();
+
+  Future<void> togglePlaybackOrderLocal() => setPlaybackOrderLocal(_playbackOrder.toggled);
+
+  void toggleLoopMode() => unawaited(_backend.toggleLoopMode());
+
+  /// Cycles this device's loop mode. The radio, a feature of this device's queue, is disabled by toggling.
+  void toggleLoopModeLocal() {
+    final radioMode = FinampSettingsHelper.finampSettings.radioMode;
+    final radioEnabled = FinampSettingsHelper.finampSettings.radioEnabled;
+    final radioSeed = _providers.read(getActiveRadioSeedProvider(radioMode));
+    final radioAvailabilityStatus = _providers.read(radioModeAvailabilityStatusProvider((radioMode, radioSeed)));
+    final radioActive = radioEnabled && radioAvailabilityStatus.isAvailable;
+
+    // if we start toggling loop modes, the radio should be disabled, to prevent it kicking back in when it becomes available
+    if (radioEnabled) {
+      toggleRadio(false);
     }
-  }
-
-  void toggleLoopMode() {
-    // The radio is a feature of this device's queue, so it only matters while that is the active backend
-    if (!_controller.isRemote) {
-      final radioMode = FinampSettingsHelper.finampSettings.radioMode;
-      final radioEnabled = FinampSettingsHelper.finampSettings.radioEnabled;
-      final radioSeed = _providers.read(getActiveRadioSeedProvider(radioMode));
-      final radioAvailabilityStatus = _providers.read(radioModeAvailabilityStatusProvider((radioMode, radioSeed)));
-      final radioActive = radioEnabled && radioAvailabilityStatus.isAvailable;
-
-      // if we start toggling loop modes, the radio should be disabled, to prevent it kicking back in when it becomes available
-      if (radioEnabled) {
-        toggleRadio(false);
-      }
-      // if the radio was active, we also reset the loop mode
-      if (radioActive) {
-        loopMode = FinampLoopMode.none;
-        return;
-      }
+    // if the radio was active, we also reset the loop mode
+    if (radioActive) {
+      setLoopModeLocal(FinampLoopMode.none);
+      return;
     }
 
-    final currentMode = _controller.loopMode.valueOrNull ?? _loopMode;
-    if (currentMode == FinampLoopMode.all) {
-      loopMode = FinampLoopMode.one;
-    } else if (currentMode == FinampLoopMode.one) {
-      loopMode = FinampLoopMode.none;
-    } else {
-      loopMode = FinampLoopMode.all;
-    }
+    setLoopModeLocal(_loopMode.next);
   }
 
   Logger get queueServiceLogger => _queueServiceLogger;

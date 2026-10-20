@@ -73,6 +73,10 @@ class LocalPlaybackBackend implements PlaybackBackend {
   @override
   Future<void> setPlaybackOrder(FinampPlaybackOrder order, {List<int>? shuffleOrder}) =>
       _queueService.setPlaybackOrderLocal(order, shuffleOrder: shuffleOrder);
+  @override
+  Future<void> toggleLoopMode() async => _queueService.toggleLoopModeLocal();
+  @override
+  Future<void> togglePlaybackOrder() => _queueService.togglePlaybackOrderLocal();
 
   @override
   bool supports(PlaybackCapability capability) => true;
