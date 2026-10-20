@@ -783,6 +783,39 @@ class JellyfinApiHelper {
     await jellyfinApi.updateCapabilitiesFull(capabilities);
   }
 
+  /// Gets the sessions the current user can remotely control, excluding this device.
+  Future<List<SessionInfo>> getControllableSessions() async {
+    assert(_verifyCallable());
+    final response = await jellyfinApi.getSessions(controllableByUserId: _finampUserHelper.currentUser!.id);
+    final deviceInfo = await jellyfin_api.getDeviceInfo(deviceId: FinampSettingsHelper.finampSettings.deviceId);
+    return (response as List<dynamic>)
+        .map((session) => SessionInfo.fromJson(session as Map<String, dynamic>))
+        .where((session) => session.deviceId != deviceInfo.id)
+        .toList();
+  }
+
+  /// Starts playback of [itemIds] on a remote session, starting at [startPosition] of the first item.
+  Future<void> playOnSession({
+    required String sessionId,
+    required List<BaseItemId> itemIds,
+    Duration startPosition = Duration.zero,
+  }) async {
+    assert(_verifyCallable());
+    await jellyfinApi.playOnSession(
+      sessionId: sessionId,
+      playCommand: "PlayNow",
+      itemIds: itemIds.join(","),
+      startPositionTicks: startPosition.inMicroseconds * 10,
+      startIndex: 0,
+    );
+  }
+
+  /// Sends a playstate command (e.g. "PlayPause", "NextTrack", "PreviousTrack") to a remote session.
+  Future<void> sendPlaystateCommand({required String sessionId, required String command}) async {
+    assert(_verifyCallable());
+    await jellyfinApi.sendPlaystateCommand(sessionId: sessionId, command: command);
+  }
+
   /// Tells the Jellyfin server that playback has started
   Future<void> reportPlaybackStart(PlaybackProgressInfo playbackProgressInfo) async {
     assert(_verifyCallable());

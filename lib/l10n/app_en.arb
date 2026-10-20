@@ -2314,6 +2314,39 @@
     "@outputMenuOpenConnectionSettingsButtonTitle": {
         "description": "Button title for connecting to a device from the output menu"
     },
+    "outputMenuPlayOnSectionTitle": "Play On",
+    "@outputMenuPlayOnSectionTitle": {
+        "description": "Title for the section in the output menu listing other Jellyfin sessions that can be remote-controlled"
+    },
+    "playOnNoSessionsFound": "No other sessions found",
+    "@playOnNoSessionsFound": {
+        "description": "Shown in the output menu when there are no other Jellyfin sessions that can be remote-controlled"
+    },
+    "playOnSessionSubtitle": "{client} · {nowPlaying}",
+    "@playOnSessionSubtitle": {
+        "description": "Subtitle for a remote Jellyfin session in the output menu, showing the client name and the currently playing track",
+        "placeholders": {
+            "client": {
+                "type": "String"
+            },
+            "nowPlaying": {
+                "type": "String"
+            }
+        }
+    },
+    "playOnTransferQueueTooltip": "Play the current queue on this device",
+    "@playOnTransferQueueTooltip": {
+        "description": "Tooltip for the button that sends the current queue to a remote Jellyfin session"
+    },
+    "playOnQueueTransferred": "Now playing on {deviceName}",
+    "@playOnQueueTransferred": {
+        "description": "Snackbar message shown after the current queue was sent to a remote Jellyfin session",
+        "placeholders": {
+            "deviceName": {
+                "type": "String"
+            }
+        }
+    },
     "deviceType": "{type, select, speaker{Device Speaker} tv{TV} bluetooth{Bluetooth} other{Unknown}}",
     "@deviceType": {
         "placeholders": {

@@ -10,8 +10,10 @@ import 'package:finamp/components/themed_bottom_sheet.dart';
 import 'package:finamp/components/toggleable_list_tile.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
+import 'package:finamp/models/jellyfin_models.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
+import 'package:finamp/services/jellyfin_api_helper.dart';
 import 'package:finamp/services/music_player_background_task.dart';
 import 'package:finamp/services/output_route_provider.dart';
 import 'package:finamp/services/queue_service.dart';
@@ -129,6 +131,17 @@ Future<void> showOutputMenu({required BuildContext context, bool usePlayerTheme 
               height: OutputMenuHeader.defaultHeight,
               child: OutputTargetList(), // Pass the outputRoutes
             ),
+          ),
+        if (!FinampSettingsHelper.finampSettings.isOffline)
+          SliverStickyHeader(
+            header: Padding(
+              padding: const EdgeInsets.only(top: 10.0, bottom: 8.0, left: 16.0, right: 16.0),
+              child: Text(
+                AppLocalizations.of(context)!.outputMenuPlayOnSectionTitle,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            sliver: MenuMask(height: OutputMenuHeader.defaultHeight, child: const PlayOnSessionList()),
           ),
       ];
       // TODO better estimate, how to deal with lag getting playlists?
@@ -319,6 +332,123 @@ class OutputSelectorTile extends StatelessWidget {
       },
       confirmationFeedback: false,
       enabled: true,
+    );
+  }
+}
+
+/// Lists the other Jellyfin sessions of the current user and lets the user
+/// remote-control them ("Play On"), or send the current queue to them.
+class PlayOnSessionList extends StatefulWidget {
+  const PlayOnSessionList({super.key});
+
+  @override
+  State<PlayOnSessionList> createState() => _PlayOnSessionListState();
+}
+
+class _PlayOnSessionListState extends State<PlayOnSessionList> {
+  final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
+  late Future<List<SessionInfo>> sessions = jellyfinApiHelper.getControllableSessions();
+
+  Future<void> _sendCommand(SessionInfo session, String command) async {
+    try {
+      await jellyfinApiHelper.sendPlaystateCommand(sessionId: session.id!, command: command);
+      FeedbackHelper.feedback(FeedbackType.selection);
+    } catch (e) {
+      GlobalSnackbar.error(e);
+    }
+  }
+
+  Future<void> _transferQueue(SessionInfo session) async {
+    final queueService = GetIt.instance<QueueService>();
+    final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
+    // Item ids are sent as a query parameter, so cap the amount to keep the URL short enough
+    final itemIds = queueService.peekQueue(current: true).take(200).map((queueItem) => queueItem.baseItemId).toList();
+    if (itemIds.isEmpty) return;
+    try {
+      final startPosition = audioHandler.playbackPosition;
+      await audioHandler.pause();
+      await jellyfinApiHelper.playOnSession(sessionId: session.id!, itemIds: itemIds, startPosition: startPosition);
+      FeedbackHelper.feedback(FeedbackType.success);
+      GlobalSnackbar.message(
+        (context) => AppLocalizations.of(context)!.playOnQueueTransferred(session.deviceName ?? session.client ?? ""),
+        isConfirmation: true,
+      );
+    } catch (e) {
+      GlobalSnackbar.error(e);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: sessions,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          GlobalSnackbar.error(snapshot.error);
+          return const SliverToBoxAdapter(child: Center(heightFactor: 3.0, child: Icon(Icons.error, size: 64)));
+        } else if (!snapshot.hasData) {
+          return const SliverToBoxAdapter(
+            child: Center(heightFactor: 2.0, child: CircularProgressIndicator.adaptive()),
+          );
+        } else if (snapshot.data!.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                AppLocalizations.of(context)!.playOnNoSessionsFound,
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+        return SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final session = snapshot.data![index];
+            final nowPlaying = session.nowPlayingItem?.name;
+            return ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(16.0),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                child: const Icon(TablerIcons.devices),
+              ),
+              title: Text(session.deviceName ?? session.client ?? ""),
+              subtitle: Text(
+                nowPlaying == null
+                    ? session.client ?? ""
+                    : AppLocalizations.of(context)!.playOnSessionSubtitle(session.client ?? "", nowPlaying),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(TablerIcons.player_skip_back),
+                    tooltip: AppLocalizations.of(context)!.skipToPreviousTrackButtonTooltip,
+                    onPressed: () => _sendCommand(session, "PreviousTrack"),
+                  ),
+                  IconButton(
+                    icon: const Icon(TablerIcons.player_play),
+                    tooltip: AppLocalizations.of(context)!.togglePlaybackButtonTooltip,
+                    onPressed: () => _sendCommand(session, "PlayPause"),
+                  ),
+                  IconButton(
+                    icon: const Icon(TablerIcons.player_skip_forward),
+                    tooltip: AppLocalizations.of(context)!.skipToNextTrackButtonTooltip,
+                    onPressed: () => _sendCommand(session, "NextTrack"),
+                  ),
+                  IconButton(
+                    icon: const Icon(TablerIcons.cast),
+                    tooltip: AppLocalizations.of(context)!.playOnTransferQueueTooltip,
+                    onPressed: () => _transferQueue(session),
+                  ),
+                ],
+              ),
+            );
+          }, childCount: snapshot.data!.length),
+        );
+      },
     );
   }
 }
